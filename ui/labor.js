@@ -145,7 +145,7 @@
        否则「应发 − 社保 − 公积金 − 起征点 − 专扣」算不回引擎的税基。 */
     var parts = ['应发 ' + money(gross)];
     if (c.tax && c.tax.type !== 'intern') {
-      if (P.si > 0.5) parts.push('社保 ' + money(P.si) + '（基 ' + money(r.siBase) + ' × ' + pct1(ctx.siRate) + '）');
+      if (P.si > 0.5) parts.push('社保 ' + money(P.si) + '（基 ' + money(r.siBase) + ' ' + (r.siMode === 'min' ? '按下限' : (r.siMode === 'self' ? '最低档' : (r.gross > ((r.city && r.city.max) || 0) ? '按上限' : '按实发'))) + ' × ' + pct1(ctx.siRate) + '）');
       if (P.hf > 0.5) parts.push('公积金 ' + money(P.hf) + '（基 ' + money(r.hfBase) + ' × ' + pct1(ctx.hfRate) + '）');
       if (P.annuity > 0.5) parts.push('年金 ' + money(P.annuity) + '（基 ' + money(gross) + ' × ' + pct1(ctx.annRate) + '）');
       var bonusM = (r.bonusMethod === 'separate' ? (r.bonusAnnual || 0) : 0) / 12;
@@ -282,6 +282,18 @@
     var P = r.p;
     var siBase = r.siBase, hfBase = r.hfBase;
     var siRate = siBase > 0 ? (P.pension + P.medical + P.unemp) / siBase : 0;
+    /* 社保基数被「钉住」时要自我说明：min 模式按下限缴，工资超过下限后社保不再变化 */
+    var CITY = (r.city && r.city.max) ? r.city : (D.cities[r.city] || {});
+    var siWhy = (r.siMode === 'min') ? '按下限缴'
+      : (r.siMode === 'self') ? '灵活就业最低档'
+      : (r.siMode === 'project') ? '按项目 / 按次'
+      : (r.siMode === 'none') ? '不计社保'
+      : (G > (CITY.max || 0)) ? '按上限封顶' : '按实际工资';
+    function siBaseLabel() {
+      if (r.siMode === 'none' || r.siMode === 'project') return '不计社保';
+      if (r.siMode === 'min') return '缴费基数 ' + money(siBase) + '（按下限缴，非实际工资 ' + money(G) + '）';
+      return '缴费基数 ' + money(siBase) + '（' + siWhy + '）';
+    }
     var hfRate = r.hfRate;
     var annRate = ((c.si && c.si.annuity && c.si.annuity.p) || 0) / 100;
     var taxBase = r.taxBase || 0, taxRate = r.taxRate || 0;
@@ -296,7 +308,7 @@
       {
         id: 'd:si', label: '社保个人 ' + pct1(siRate), after: '缴社保后',
         v: P.pension + P.medical + P.unemp,
-        base: '基数 ' + money(siBase) + ' × ' + pct1(siRate),
+        base: siBaseLabel() + ' × ' + pct1(siRate),
         dests: [['t:pacct', '养老个人账户', PAL.acct, P.pensionAcct],
                 /* 统筹是单位缴的钱，个人视角只保留灵活就业「自缴 12%」那一档 */
                 ['t:ppool', '养老统筹（自缴 12%）', PAL.pool, P.pensionPool],
