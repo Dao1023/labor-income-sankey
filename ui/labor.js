@@ -24,7 +24,7 @@
     deduct: '#e29a3c',
     net: '#16a34a',
     acct: '#0ea5e9',
-    fund: '#0d9488',
+    fund: '#0ea5e9',
     pool: '#8b5cf6',
     tax: '#dc2626',
     agency: '#94a3b8',
@@ -189,6 +189,31 @@
       dests[id].amount += amount;
     }
 
+    /* 去向节点的「钱归谁」：颜色编码之外，tooltip 再给一句话 */
+    var OWNER = {
+      't:net': '归你 · 已到手',
+      't:hf': '归你 · 账户锁定，可提取',
+      't:pacct': '归你 · 养老个人账户',
+      't:med': '归你 · 医保个人账户',
+      't:ann': '归你 · 年金账户',
+      't:ppool': '进统筹池 · 换取待遇',
+      't:medpool': '进统筹池 · 换取待遇',
+      't:unemp': '进统筹池 · 换取待遇',
+      't:injury': '进统筹池 · 换取待遇',
+      't:tax': '进国库 · 个税',
+      't:agency': '平台 / 中介拿走',
+      't:other': '其他扣缴合计'
+    };
+    /* 不足 1.2%（且低于 20 元）的落点并进「其他扣缴」，不留无标签的漂浮色块 */
+    var tinyThreshold = Math.max(20, pctBase * 0.012);
+    function target(id, label, color, amount) {
+      /* 单位成本视角的统筹池本身就有语义（工伤 0.3% 也得看得见），不参与合并 */
+      var keepPool = employerView && /^t:(ppool|medpool|unemp|injury)$/.test(id);
+      if (id !== 't:net' && !keepPool && amount < tinyThreshold) return ['t:other', '其他扣缴', PAL.agency];
+      return [id, label, color];
+    }
+    function ownerOf(id) { return OWNER[id] || ''; }
+
     /* ---------- 第 1 列：收入构成（按案例的 7 项拆分） ---------- */
     var grossRatio = revenue > 0 ? G / revenue : 1;
     (r.comps || []).forEach(function (cp, i) {
@@ -236,19 +261,20 @@
         id: 'd:si', label: '社保个人 ' + pct1(siRate), v: P.pension + P.medical + P.unemp,
         base: '基数 ' + money(siBase) + ' × ' + pct1(siRate),
         dests: [['t:pacct', '养老个人账户', PAL.acct, P.pensionAcct],
-                ['t:ppool', '养老统筹', PAL.pool, P.pensionPool],
+                /* 统筹是单位缴的钱，个人视角只保留灵活就业「自缴 12%」那一档 */
+                ['t:ppool', '养老统筹（自缴 12%）', PAL.pool, P.pensionPool],
                 ['t:med', '医疗个人账户', PAL.acct, P.medical],
                 ['t:unemp', '失业统筹', PAL.pool, P.unemp]]
       },
       {
         id: 'd:hf', label: '公积金 ' + pct1(hfRate), v: P.hf,
         base: '基数 ' + money(hfBase) + ' × ' + pct1(hfRate),
-        dests: [['t:hf', '公积金账户', PAL.fund, P.hf]]
+        dests: [['t:hf', '公积金账户', PAL.acct, P.hf]]
       },
       {
         id: 'd:ann', label: '年金 ' + pct1(annRate), v: P.annuity,
         base: '基数 ' + money(G) + ' × ' + pct1(annRate),
-        dests: [['t:ann', '年金账户', PAL.fund, P.annuity]]
+        dests: [['t:ann', '年金账户', PAL.acct, P.annuity]]
       },
       {
         id: 'd:tax', label: '个税', v: P.tax,
@@ -263,8 +289,9 @@
       flow('gross', id, it.v, PAL.deduct);
       it.dests.forEach(function (d) {
         if (!(d[3] > 0.004)) return;
-        flow(id, d[0], d[3], d[2]);
-        sink(d[0], d[1], d[2], d[3], 3);
+        var t = target(d[0], d[1], d[2], d[3]);
+        flow(id, t[0], d[3], t[2]);
+        sink(t[0], t[1], t[2], d[3], 3);
       });
     });
 
@@ -282,27 +309,41 @@
       fill('unit', '单位缴纳', eTotal, 1, PAL.unit, 'top');
       flow('u:extra', 'unit', eTotal, PAL.unit);
 
+      /* 单位侧也做抽象：社保合成一条粗带（养老/医疗/失业/工伤），公积金、年金各一条。
+         五险明细只进 tooltip，避免四条细流从右下穿过个人流带。 */
+      var siBaseEr = r.siBase || G;
+      var erTip = '养老 ' + money(ER.pension) + ' · 医疗 ' + money(ER.medical) +
+                  ' · 失业 ' + money(ER.unemp) + ' · 工伤 ' + money(ER.injury);
       var parts = [
-        ['u:pension', '单位养老', ER.pension, 't:ppool', '养老统筹', PAL.pool],
-        ['u:medical', '单位医疗', ER.medical, 't:medpool', '医疗统筹', PAL.pool],
-        ['u:unemp', '单位失业', ER.unemp, 't:unemp', '失业统筹', PAL.pool],
-        ['u:injury', '单位工伤', ER.injury, 't:injury', '工伤统筹', PAL.pool],
-        ['u:hf', '单位公积金', ER.hf, 't:hf', '公积金账户', PAL.fund],
-        ['u:annuity', '单位年金', ER.annuity, 't:ann', '年金账户', PAL.fund],
-        ['u:agency', '中介服务费', ER.agency, 't:agency', '平台 / 中介', PAL.agency]
+        { id: 'u:si', label: '单位社保 ' + pct1(ER.si / siBaseEr), v: ER.si, tip: erTip,
+          dests: [['t:ppool', '养老统筹', PAL.pool, ER.pension],
+                  ['t:medpool', '医疗统筹', PAL.pool, ER.medical],
+                  ['t:unemp', '失业统筹', PAL.pool, ER.unemp],
+                  ['t:injury', '工伤统筹', PAL.pool, ER.injury]] },
+        { id: 'u:hf', label: '单位公积金 ' + pct1(r.hfRate || 0), v: ER.hf,
+          dests: [['t:hf', '公积金账户', PAL.acct, ER.hf]] },
+        { id: 'u:ann', label: '单位年金 ' + pct1(annRate), v: ER.annuity,
+          dests: [['t:ann', '年金账户', PAL.acct, ER.annuity]] },
+        { id: 'u:agency', label: '中介服务费', v: ER.agency,
+          dests: [['t:agency', '平台 / 中介', PAL.agency, ER.agency]] }
       ];
       parts.forEach(function (p) {
-        if (!(p[2] > 0.004)) return;
-        var id = fill(p[0], p[1], p[2], 2, PAL.unit, 'right');
+        if (!(p.v > 0.004)) return;
+        var id = fill(p.id, p.label, p.v, 2, PAL.unit, 'right');
         if (!id) return;
-        flow('unit', id, p[2], PAL.unit);
-        flow(id, p[3], p[2], p[5]);
-        sink(p[3], p[4], p[5], p[2], 3);
+        if (p.tip) nodes[nodes.length - 1].detailNote = p.tip;
+        flow('unit', id, p.v, PAL.unit);
+        p.dests.forEach(function (d) {
+          if (!(d[3] > 0.004)) return;
+          var tt = target(d[0], d[1], d[2], d[3]);
+          flow(id, tt[0], d[3], tt[2]);
+          sink(tt[0], tt[1], tt[2], d[3], 3);
+        });
       });
     }
 
     /* ---------- 去向列（钱归谁：到手 → 账户 → 统筹 → 国库 → 平台） ---------- */
-    var ORDER = ['t:net', 't:hf', 't:pacct', 't:med', 't:ann', 't:ppool', 't:medpool', 't:unemp', 't:injury', 't:tax', 't:agency'];
+    var ORDER = ['t:net', 't:hf', 't:pacct', 't:med', 't:ann', 't:ppool', 't:medpool', 't:unemp', 't:injury', 't:other', 't:tax', 't:agency'];
     destOrder.sort(function (a, b) {
       var ia = ORDER.indexOf(a), ib = ORDER.indexOf(b);
       return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
@@ -313,15 +354,15 @@
       if (id === 't:net') {
         var hit = null;
         nodes.forEach(function (n) { if (n.name === 't:net') hit = n; });
-        if (hit) { hit.value = d.amount; hit.pct = pctOf(d.amount, pctBase); hit.pctLine = fmtPct(hit.pct) + ' ' + pctWord + ' · ' + money(d.amount); }
+        if (hit) { hit.value = d.amount; hit.ownerNote = ownerOf(id); hit.pct = pctOf(d.amount, pctBase); hit.pctLine = fmtPct(hit.pct) + ' ' + pctWord + ' · ' + money(d.amount); }
         return;
       }
-      fill(id, d.label, d.amount, 3, d.color, 'right');
+      if (fill(id, d.label, d.amount, 3, d.color, 'right')) nodes[nodes.length - 1].ownerNote = ownerOf(id);
     });
 
     /* ---------- 列内顺序：单位成本支干置顶，其次收入构成；扣缴 / 去向按固定次序 ---------- */
     var DORDER = ['d:si', 'd:hf', 'd:ann', 'd:tax'];
-    var UORDER = ['u:pension', 'u:medical', 'u:unemp', 'u:injury', 'u:hf', 'u:annuity', 'u:agency'];
+    var UORDER = ['u:si', 'u:hf', 'u:ann', 'u:agency'];
     function rankOf(n) {
       if (n.name === 'u:extra') return 0;
       if (n.name.indexOf('inc') === 0) return 10 + (+n.name.slice(3) || 0);

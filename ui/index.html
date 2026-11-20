@@ -73,6 +73,11 @@ body { background:var(--bg); color:var(--text); font-family:"Segoe UI","Microsof
 #chartPanel .in-title { text-align:center; padding:4px 16px 8px; font-size:clamp(20px, 2.05vw, 30px); line-height:1.2; font-weight:800; color:var(--title-blue); overflow-wrap:anywhere; }
 #sankey { width:100%; height:660px; display:block; }
 
+/* ---- 图例与公式带（图下方、滑杆上方） ---- */
+.chartLegend { display:flex; flex-wrap:wrap; align-items:center; gap:6px 16px; padding:0 26px 6px; font-size:12px; color:var(--muted); }
+.chartLegend i { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
+#formulaLine { padding:0 26px 6px; font-size:13px; line-height:1.5; color:var(--muted); text-align:left; font-variant-numeric:tabular-nums; }
+
 /* ---- bottom salary slider (upstream quarter timeline, same interaction skeleton) ---- */
 #timeline { padding:10px 26px 16px; }
 .tl-head { display:flex; justify-content:space-between; align-items:baseline; margin:0 30px 8px; font-size:12.5px; color:var(--muted); }
@@ -201,6 +206,8 @@ body { background:var(--bg); color:var(--text); font-family:"Segoe UI","Microsof
       <div class="meta" id="metaLine"></div>
       <div class="in-title" id="chartTitle"></div>
       <div id="sankey"></div>
+      <div class="chartLegend" id="chartLegend" aria-label="颜色图例"></div>
+      <div id="formulaLine"></div>
       <div id="timeline">
         <div class="tl-head"><span class="tl-cap">薪资档位</span><span class="tl-now"><b id="tlNow"></b><span class="tl-unit">/ 月</span></span></div>
         <div class="tl-track" id="tlTrack"><div class="tl-fill" id="tlFill"></div><div class="tl-thumb" id="tlThumb" role="slider" tabindex="0" aria-label="薪资档位" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext=""></div></div>

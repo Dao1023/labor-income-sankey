@@ -186,6 +186,7 @@ function renderChart() {
   const bundle = computeNow();
   window.__bundle = bundle;
   const g = buildGraph(bundle, state.view === 'cost');
+  renderLegend(g);
   window.__bridgeCheck = checkConsistency(bundle, g);
   window.__sankeyMeta = {
     caseId: state.caseId,
@@ -227,14 +228,17 @@ function renderChart() {
 
   const labelOf = new Map(g.nodes.map(n => [n.name, n.labelText]));
   const data = g.nodes.map(n => {
-    const d = { name: n.name, value: n.value, depth: n.depth, labelText: n.labelText, baseNote: n.baseNote, itemStyle: n.itemStyle };
+    const d = { name: n.name, value: n.value, depth: n.depth, labelText: n.labelText, baseNote: n.baseNote, ownerNote: n.ownerNote, detailNote: n.detailNote, itemStyle: n.itemStyle };
     let pos = 'top';
     if (n.depth === 0) pos = 'left';
     else if (n.depth >= 3) pos = 'right';
     d.label = { position: pos, distance: pos === 'top' ? 6 : 8, formatter: nodeLabel };
     /* 极小节点：标签（两行 37px）比色块还高，画出来只会互相压字。
        1.5% 以下不画标签——它的去向节点仍带名字和金额，信息不丢。 */
-    if (n.value < 2 || (pctBase > 0 && n.value / pctBase < 0.015)) d.label = { show: false };
+    if (n.name === 't:other') d.label = { position: 'bottom', distance: 6, formatter: nodeLabel };
+    else if (state.view === 'cost' && /^t:(ppool|medpool|unemp|injury)$/.test(n.name) && n.value >= 20) {
+      d.label = { position: 'right', distance: 8, formatter: nodeLabel };  /* 单位视角的统筹池：再小也要有名有姓 */
+    } else if (n.value < 2 || (pctBase > 0 && n.value / pctBase < 0.012)) d.label = { show: false };
     return d;
   });
 
@@ -275,8 +279,12 @@ function renderChart() {
         }
         const pc = pctBase > 0 ? p.value / pctBase * 100 : 0;
         const bn = p.data && p.data.baseNote;
+        const ow = p.data && p.data.ownerNote;
         return '<b>' + ((p.data && p.data.labelText) || labelName(p)) + '</b><br/>' + dispSym() + amtText(p.value) +
-          '<br/>' + fmtPct1(pc) + ' ' + pctWord + (bn ? '<br/><span style="color:#52607a">' + bn + '</span>' : '');
+          '<br/>' + fmtPct1(pc) + ' ' + pctWord +
+          (bn ? '<br/><span style="color:#52607a">' + bn + '</span>' : '') +
+          (ow ? '<br/><span style="color:#52607a">' + ow + '</span>' : '') +
+          (p.data && p.data.detailNote ? '<br/><span style="color:#52607a">' + p.data.detailNote + '</span>' : '');
       }
     },
     series: [series]
@@ -544,12 +552,26 @@ function renderMeta(bundle) {
   bits.push('社保 ' + bundle.meta.si);
   bits.push('应发 ' + money(r.gross) + '/月');
   if (r.revenue > r.gross + 0.5) bits.push('流水 ' + money(r.revenue) + '/月');
-  /* 公式带：位置与样式沿用上游 #segNotesLine / .segNote，内容换成逐项展开的算式。
-     每一项都来自引擎结果（r.*），口径说明（tag / caveat）挪到「口径说明」弹窗里。 */
-  const band = bundle.formula || '';
   document.getElementById('metaLine').innerHTML =
-    bits.map(b => '<span>' + b + '</span>').join(' · ') +
-    (band ? '<div class="segNote" id="segNotesLine">' + band + '</div>' : '');
+    bits.map(b => '<span>' + b + '</span>').join(' · ');
+}
+
+/* 公式带：图下方、滑杆上方的一行灰字，逐项展开税基与档位（数字全部来自引擎） */
+/* 图例按图上真实出现的颜色生成，没有「平台 / 中介」的案例就不显示那一项 */
+function renderLegend(g) {
+  const el = document.getElementById('chartLegend');
+  if (!el || !g) return;
+  const have = new Set(g.nodes.map(n => n.itemStyle && n.itemStyle.color));
+  const items = [['#16a34a', '你的现金'], ['#0ea5e9', '你的账户'], ['#8b5cf6', '共担池'],
+                 ['#dc2626', '税'], ['#94a3b8', '平台 / 中介 · 其他']];
+  el.innerHTML = items.filter(it => have.has(it[0]))
+    .map(it => '<span><i style="background:' + it[0] + '"></i>' + it[1] + '</span>').join('');
+}
+
+function renderFormula(bundle) {
+  const el = document.getElementById('formulaLine');
+  if (!el) return;
+  el.textContent = bundle.formula || '';
 }
 
 function renderControls() {
@@ -582,6 +604,7 @@ function render() {
   const bundle = computeNow();
   window.__bundle = bundle;
   renderMeta(bundle);
+  renderFormula(bundle);
   renderControls();
   renderLogoRail();
   renderTimeline();
