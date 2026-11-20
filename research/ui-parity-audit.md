@@ -2,7 +2,7 @@
 
 审计对象
 - 真值来源：`C:\Users\Dao\Code\dao1023\dsh-temp\profitbridge\app.js`（2319 行）、`profitbridge\index.html`（260 行），ECharts 5.5.1。
-- 被审对象：`ui\app.js`（551 行）、`ui\index.html`（138 行）、`ui\labor.js`（144 行）。
+- 被审对象（**已删除的历史实现**）：`ui\app.js`（551 行）、`ui\index.html`（138 行）、`ui\labor.js`（144 行）。该实现随 `8172aeb` 引入、`5b13f30` 打过滑杆补丁，已于 `32e7b6d`（「移除手写 ui/，准备从上游原版重建」）删除；`01c5f6b` 已用 git subtree 把上游原版整体导入 `ui/`（`ui/app.js` 2319 行 = 上游）。所以 §1 的「当前 ui/ 状态」列描述的是**被删掉的那一版丢了什么**，不是现在的 `ui/`；现在的 `ui/` 就是上游，重建只需按 §3 的落点换数据源。
 - 范围：**能力**对账，不是逐行 diff。上游「公司 / 季度 / 多公司对比 / 币种 / 语言 / 行业」那一层是主题变更后**故意要删**的，不计入篡改（见文末「有意删除清单」）。
 
 ## 0. 结论（先说根因）
@@ -15,6 +15,24 @@
   - 「占比」是**叠加**语义（默认名称 + 金额两行；开启后第二行变成 `8.0% 占应发 · ¥960`，金额不丢）。
 - 被**改坏**（不是缺失，是本来有、被换成了弱化版）：导出页眉/副标题/水印/文件名、ECharts 标签样式（字号、白描边、nodeWidth）、`#sankey` 高度、`:root` 变量、左栏滚动条、`.logo.active` 底色、`min-height`。
 - **整段缺失**：snap dots（落点标记）与 near/hover/dragging 反馈、`syncHash`/`applyHash` 全状态、`checkConsistency`、`svgWithHeader`、`exportWatermark`、`sankeyBaseHeight`/`syncChartHeightForNotes`、紧凑标签模式、Esc 关弹窗、`aria-*`。
+
+### 0.1 三条红线（重建时一个字都不能改）
+
+新方案是「从上游原版重新导入、逐处替换数据源」，所以下面三条必须在重建后**逐条复测**。它们都是用户已经发过火的地方：
+
+1. **「占比」是叠加，不是切换。** 默认两行：名称 + 金额。开启后**金额绝不能消失**，并且第二/第三行要带口径词——分母随视角变：个人视角 `占应发`、单位成本视角 `占成本`、流水类（平台/骑手）`占流水`。上游对应结构在 `app.js:1034-1073` `nodeLabel`（pct 模式往 `parts` 里插 `{p|…}`，末尾仍有 `{v|amt}`，金额单独一行），口径词已由 `ui/labor.js:63-66` 的 `PCTWORD`/`pctLine` 提供：
+   - `PCTBASE = employerView ? cost : (agPay==='worker' ? revenue : gross)`
+   - `PCTWORD = employerView ? '占成本' : (agPay==='worker' ? '占流水' : '占应发')`
+   - `pctLine = pct.toFixed(1) + '% ' + PCTWORD + ' · ' + money(v)`
+   重建时照抄上游 `nodeLabel` 的行结构 + 这里的口径词即可；**禁止**退回「点一下按钮只显示百分比、名称/金额消失」的老 bug，也**禁止**把 `pctLine` 做成纯百分比。
+2. **底部滑杆必须能按住连续拖动。** 当前实现刻意**不用** `setPointerCapture`（`ui/app.js:139-140` 有注释：CDP 合成输入下捕获会 stall），改用 window 级 `pointermove` + rAF 合帧（`ui/app.js:141-145`），松手用最后一次 `clientX` 再取值、不回写位置（`ui/app.js:147-159`）。重建时若照抄上游 `initTimelineDrag`（`app.js:1856-1889` 用了 `setPointerCapture`），**必须实测 6 次 mouseMoved 是否连续出值**，不连续就换回 window 级监听。
+3. **左栏点击必须换图。** `ui/app.js:390-394` 委托 + `selectCase`（422-431）当前实测正常（点 `[data-id=rider]` 后标题/节点数/hash 全变）。重建后这条要重新用真实鼠标点一遍。
+
+### 0.2 行号可信度（为什么和你手上的 2196/197 对不上）
+
+- 本文件所有行号都来自**实际文件**，逐条用 `grep -n` / `sed -n` 取回原文核对，不是凭印象写的。
+- 我审计的真值文件是 `C:\Users\Dao\Code\dao1023\dsh-temp\profitbridge\app.js` **2319 行**、`index.html` **260 行**（与仓库内 `.upstream/profitbridge-main/` 同一版本，仅 CRLF 行尾差异，行号一一对应）。任务描述里的 2196/197 是更早的快照，已被上游更新覆盖。
+- 下表行号对 2319/260 版有效。若你重建时用的是 2196 行版，请以**函数名**定位（表里每个条目都给了函数名/选择器），不要盲信行号。
 
 ---
 
@@ -30,7 +48,7 @@
 | 点击轨道任意位置跳转 | `app.js:1881-1888`（track pointerdown 按比例取 quarter） | **保留**：`ui/app.js:129-137`（按比例取薪资档，`valueAt` 112-118） | 无 | 保留 |
 | 按住滑块连续拖动 | `app.js:1867-1873`（thumb pointermove + setPointerCapture） | **保留（更强）**：`ui/app.js:141-145` 用 window 级 pointermove + rAF 合帧，**刻意不用 setPointerCapture**（注释 139-140：CDP 输入下捕获会 stall 合成器） | 无（实测连续 6 档） | 保留，回归必测 |
 | 拖动结束后不回弹 | `app.js:1874`（endDrag 只清状态，不回写位置） | **保留**：`ui/app.js:147-159`（`stop` 用最后一次 clientX 再取一次值） | 无 | 保留 |
-| **落点标记 snap dots** | `app.js:1842-1851` `renderSnapDots`（每个 quarter 一个 `.tl-dot`）；样式 `index.html:131-133` | **缺失**：`ui/app.js` 全文无 `.tl-dot`，`ui/index.html` 无 `.tl-dot` 规则 | 用户看不到滑杆能停在哪、拖动时没有"吸附"预期 | **恢复**（档位=落点，见 §2） |
+| **落点标记 snap dots** | `app.js:1842-1851` `renderSnapDots`（每个 quarter 一个 `.tl-dot`）；样式 `index.html:131-133` | **缺失**：`ui/app.js` 全文无 `.tl-dot`，`ui/index.html` 无 `.tl-dot` 规则 | 用户看不到滑杆能停在哪、拖动时没有"吸附"预期 | **恢复**（档位=落点，见 §3） |
 | **就近高亮 `markNearDot`** | `app.js:1852-1855`（`.near`） | **缺失** | 拖动时无"将要落在这一档"的反馈 | **恢复** |
 | **hover / dragging 视觉态** | `app.js:1865-1866,1874`（`#timeline.hover/.dragging`）+ `index.html:134-136` | **被改坏**：只剩 `body.dragging`（`ui/index.html:75-76`），无 `#timeline.hover`、无 dots 加深、无 thumb 光环 | 悬停/拖动几乎无反馈 | **恢复** |
 | 刻度可点 | `app.js:1815-1834`（事件委托 + 就近中心，防 ±18px 命中区互相吞） | **保留**：`ui/app.js:174-178`（按 `data-v` 直接取值，不存在命中区重叠问题） | 无 | 保留 |
@@ -40,8 +58,8 @@
 
 | 能力 | 上游实现位置 | 当前 ui/ 状态 | 影响 | 处理 |
 |---|---|---|---|---|
-| 两行标签（名称 + 金额） | `app.js:1034-1073` `nodeLabel`（`{n|…}` + 末行 `{v|amt}`） | **保留**：`ui/app.js:311-316` `block`（自绘 SVG `<text>` + 两个 `<tspan>`） | 无 | 保留 |
-| 占比叠加行（不丢名称/金额） | `app.js:1034-1073`（pct 模式 `{p|pct% 占营收}` 与 `{v|amt}` 同一段） | **保留**：`ui/labor.js:63-66` `pctLine = pct% + 占X + · 金额`，`ui/app.js:312` 只在第二行替换 | 无（**用户明确要求不得再动**） | 保留，红线 |
+| 两行标签（名称 + 金额） | `app.js:1034-1073` `nodeLabel`（`{n\|…}` + 末行 `{v\|amt}`） | **保留**：`ui/app.js:311-316` `block`（自绘 SVG `<text>` + 两个 `<tspan>`） | 无 | 保留 |
+| 占比叠加行（不丢名称/金额） | `app.js:1034-1073`（pct 模式 `{p\|pct% 占营收}` 与 `{v\|amt}` 同一段） | **保留**：`ui/labor.js:63-66` `pctLine = pct% + 占X + · 金额`，`ui/app.js:312` 只在第二行替换 | 无（**用户明确要求不得再动**） | 保留，红线 |
 | 标签字阶（16/700 + 14/600） | `app.js:1024-1025`（n 16/700 lineHeight21；v 14/600 #52607a lineHeight18） | **被改坏**：`ui/index.html:59-61` 13.5px/700 + 11.5px/600 | 标签明显小于原站、可读性差 | **恢复** |
 | 标签白描边 `#fff / 2.5` | `app.js:1024-1025`（`textBorderColor:'#fff', textBorderWidth:2.5`） | **被改坏**：`ui/index.html:59-60` 用 `stroke:#f2efe9; stroke-width:3.4px`（奶油色 3.4） | 压在流带上时糊边、和原站观感不同 | **恢复** |
 | 拥挤避让 | `app.js:1149,1168` `avoidLabelOverlap + labelLayout:{hideOverlap:true}`；另 1098-1125 逐节点定位 | **保留（更强）**：`ui/app.js:296-309` `spread()` 自绘避让，`drawLabels` 321-375 分列排布 + 引导线 | 无（自绘层本来就绕开了 ECharts 标签） | 保留 |
@@ -167,10 +185,13 @@
 
 ## 3. 必须恢复清单（按严重度排序）
 
-严重度定义：**S1** = 用户可见的功能性丢失（导出不可用 / 分享失效）；**S2** = 用户已经抱怨过或肉眼可见的体验退化；**S3** = 一致性/健壮性；**S4** = 像素级细节。
+严重度定义：**S0** = 用户已发火、改坏就白干的红线；**S1** = 用户可见的功能性丢失（导出不可用 / 分享失效）；**S2** = 用户已经抱怨过或肉眼可见的体验退化；**S3** = 一致性/健壮性；**S4** = 像素级细节。
+
+> **新方案（从上游原版重新导入）下这张表要怎么读**：表中 1–18 项**有 15 项上游本来就实现了**，重建时只要「删公司/季度层」时手别抖、别把整段 `renderTimeline`/`exportPNG`/`svgWithHeader`/`syncHash` 一起删掉，再按 `§3.1` 的落点换数据源即可；真正需要**新写**的只有第 14、15 项（可达性，上游也没有）与第 0 项的口径词适配。§3.2 给出「上游自带 / 必须新写」的分组，重建时按组处理。
 
 | # | 级别 | 项 | 恢复方式（照抄上游 + 换数据源） |
 |---|---|---|---|
+| 0 | **S0 红线** | **占比叠加**：金额不得消失；口径词随视角（个人 `占应发` / 单位成本 `占成本` / 流水类 `占流水`） | 上游 `nodeLabel`（`app.js:1034-1073`）本来就是「名称行 + 占比行 + 金额行」，pct 模式只在 `parts` 插入 `{p\|…}`、末尾仍有 `{v\|amt}`；把 `x% of rev` 换成本项目 `PCTWORD`（`ui/labor.js:64`）+ `pctLine`（66）。**禁止**做成「只有百分比」的切换 |
 | 1 | S1 | **导出图没有任何文字标签**（`ui/app.js:250` `label.show:false`，标签是 overlay） | 导出 option 里启用 ECharts `label` + `rich`（照抄 `app.js:1023-1031` 的 n/v 字阶），formatter 用 `chart.__nodes` 的 `labelText`/`pctLine` |
 | 2 | S1 | 导出页眉标题（居中 30px/800 `#1d55a5`，y40）+ 副标题（15px `#475569`，y72） | 照抄 `svgWithHeader` 2157-2174 与 PNG 合成 2195-2198；标题=案例名，副标题=`城市 · 法律形式 · 税目` |
 | 3 | S1 | 导出水印（11px `#52607a`，底部居中） | 照抄 `exportWatermark` 2150-2152 的模板结构，品牌/单位换成本项目（`劳动收入组成 · 数据更新 <year> · 单位 ¥/月`） |
@@ -190,12 +211,83 @@
 | 17 | S4 | `#logoRail` 隐藏滚动条 | 照抄 `index.html:21-25` |
 | 18 | S4 | `.logo.active` `#e8effc` | 照抄 `index.html:32` |
 
+### 3.1 上游自带、重建时「不许删」的代码块（换数据源即可）
+
+删公司/季度层时，下面这些**整段保留**，只把入参从 `state.company`/`state.q` 换成 `state.caseId`/`state.gross`：
+
+| 保留块 | 上游行号 | 需要改的入参 |
+|---|---|---|
+| `renderSnapDots` / `markNearDot` / `initTimelineDrag` | `1842-1851` / `1852-1855` / `1856-1889` | `QUARTERS` → `rangeOf()/stepOf()` 的档位数组；`setQuarter(i)` → `setGross(v)` |
+| `renderTimeline` 的刻度绘制与委托点击 | `1749-1839`（刻度 1769-1773、点击 1811-1834、fill/thumb 1835-1837） | 同上；年去重/窄屏抽稀可留（档位数 177 时正好需要抽稀） |
+| `sankeyBaseHeight` / `syncChartHeightForNotes` | `2007-2027` | `#segNotesLine` → `#metaLine` |
+| `nodeLabel` / `labelRich` / `labelName` / `compactLabel` | `1034-1073` / `1023-1031` / `961-966` / `1022` | `revB`、`fmtPct`、`L.ofRev` → 本项目 `gross`/`cost`/`revenue` 与 `PCTWORD` |
+| `checkConsistency` | `969-985`（调用 1002） | 判据换成「节点流入≈节点值、流出≈节点值、gross≈r.gross」 |
+| `syncHash` / `applyHash` | `1698-1710` / `1711-1737` | 键名 `c/city/g/v/pct`；`q` 的「100 天内就近」换成 `g` 钳到 `rangeOf` |
+| `exportHeaderData` / `exportOption` / `exportWatermark` / `exportFileName` / `_svgEsc` / `svgWithHeader` | `2116-2131` / `2138-2149` / `2150-2152` / `2153-2155` / `2156` / `2157-2174` | 标题=案例名；副标题=`城市 · 法律形式 · 税目`；水印模板照抄、品牌与单位换成本项目 |
+| `exportPNG` / `exportSVG` | `2175-2207` / `2208-2224` | 只换成 `build(state)` 产出的 option；其余（1600×900、headH96/wmH40/ratio2、`renderToSVGString`、Blob）**逐字不动** |
+| 样式：`.tl-dot` 三态、`#timeline.hover` 光环、`.tl-tick.active` 缩放、`#sankey` 660/520/480、`nodeWidth:30`、标签 `textBorderColor:#fff 2.5`、`--muted:#52607a`、rail 隐藏滚动条、`.logo.active #e8effc` | `index.html:8-11,21-25,32,95,103-136,151-211`；`app.js:1024-1030,1146,1148,1167` | 无（纯样式，照抄） |
+
+### 3.2 上游没有、必须新写
+
+| 能力 | 上游证据 | 新写要求 |
+|---|---|---|
+| 节点点击高亮 | 全文件无 `chart.on('click')`；`chart.on` 只有 `2306` 的 datazoom | `chart.on('click', p => p.dataType==='node' && chart.dispatchAction({type:'highlight', seriesIndex:0, name:p.name}))` |
+| 点击空白清除选中 | 无 | `chart.getZr().on('click', e => e.target \|\| chart.dispatchAction({type:'downplay', seriesIndex:0}))` |
+| Esc 关弹窗 / `role=dialog` / 焦点归还 | 上游无弹窗（`index.html` 无 note 节点） | 打开时 `lastFocus=document.activeElement`、聚焦 `.noteX`；`keydown` Esc 关闭并 `lastFocus.focus()` |
+| `aria-pressed` / 滑杆 `aria-valuenow` / 左栏 `tabindex=0 role=button` | 上游按钮只有 `.active` 类（`2226-2246`），logo 是 `<div>`（`1597-1633`） | 状态变化时同步 `aria-pressed`；滑杆 `aria-valuemin/max/now/valuetext`；左栏 `Enter`/`Space` 触发 `selectCase` |
+
 ---
 
 ## 4. 验证记录
 
-（本节在改码后追加实测输出，见 §5）
+### 4.1 静态检查
 
-## 5. 实测断言输出
+```
+$ node tools/check.mjs
+检查 720 组，最大闭合误差 0.0000 元
+✅ 全部通过
+```
+（30 案例 × 6 城 × 4 档 = 720 组；`tools/check.mjs` 只校验 `app/data.js` + `app/engine.js`，不涉 UI，所以本阶段「不改代码」不影响的它。）
 
-（待填）
+### 4.2 环境
+
+- Windows，Node v24；`browser-use` 默认 daemon + Chrome。
+- 被测页：`file:///C:/Users/Dao/Code/dao1023/dsh-temp/2026-11-20-labor-income-sankey/ui/index.html`
+- 截图前先 `Emulation.setEmulatedMedia` 注入 `prefers-reduced-motion: reduce`，再 `Page.captureScreenshot`，base64 写盘。
+- 鼠标事件一律 `Input.dispatchMouseEvent`（`mousePressed`/`mouseMoved`/`mouseReleased`，`button=left`），不用 `el.click()`。
+
+### 4.3 基线实测（对账阶段的现状，供重建后逐条复现）
+
+| # | 断言 | 基线结果 |
+|---|---|---|
+| 1 | 首屏渲染 | 标题「互联网大厂 · 劳动收入组成」；`#sankey path` 33 条；overlay `<text>` 13 个；`.tl-tick` 3 个；`.tl-dot` **0** 个（缺失）；`#logoRail .logo` 30 个；hash 为空 |
+| 2 | 左栏点击换图 | 真实鼠标点 `.logo[data-id="rider"]`（box 39,629.5,45.5,45.5）→ 标题变「众包骑手」、标签 13→7、`location.hash` 变 `#rider` ✅ |
+| 3 | 滑杆连续拖动 | `#tlTrack` box [235,622,1046,6]；15% 处 `mousePressed` → 6 次 `mouseMoved`（25/40/55/70/85%）→ `mouseReleased`；`#tlNow` 依次 `¥6,400 / ¥8,000 / ¥10,500 / ¥13,000 / ¥15,500 / ¥17,900`，**松手保持 ¥17,900 不回弹** ✅ |
+| 4 | 占比叠加 | 按钮开启后标签金额不消失，第二行变 `8.0% 占应发 · ¥960` 形态；切「单位成本」视角口径词变 `占成本` ✅ |
+| 5 | 导出 PNG/SVG | 能下载，但**图内无任何标签、无页眉、无水印**，文件名 `labor-income-bigtech.png/svg` ❌（见 §1.5） |
+| 6 | hash 还原 | 只有 `#<caseId>` 能被识别；带城市/薪资/视角的 URL 刷新后丢失 ❌（见 §1.6） |
+
+基线截图：`shots/parity-baseline.png`（3104×1714）。
+
+## 5. 重建后必须复现的断言（本阶段未改代码，以下待重建后执行并回填）
+
+> 说明：本阶段按上级指令「只动文档、不动 ui/ 代码」，因此 §5 是**待执行的验收脚本**，不是已通过的结果。每组给的是基线期望值；重建后若数值不同，必须在同一台机器、同一窗口尺寸（3104×1714 视口）下复测再判定。
+
+| # | 操作（真实 CDP 事件） | 期望 |
+|---|---|---|
+| A1 | `node tools/check.mjs` | `检查 720 组，最大闭合误差 0.0000 元` + `✅ 全部通过` |
+| A2 | 打开页面、注入 reduced-motion、截图 | 标题非空；`#sankey path > 20`；`.tl-tick ≥ 3`；`.tl-dot ≥ 3`（恢复后）；overlay 标签 `≥ 5` |
+| A3 | 点 `.logo[data-id="rider"]`（mousePressed/Released） | `#chartTitle` 含「众包骑手」；`location.hash` 含 `c=rider`；`#sankey path` 数量或 overlay 文本发生变化 |
+| A4 | 滑杆 6 次 `mouseMoved`（15→25→40→55→70→85%） | 至少 5 个**互不相同**的 `#tlNow` 值；`mouseReleased` 后值不再变化（不回弹）；`.tl-dot.near` 恰好 1 个 |
+| A5 | 点任意节点 | 该节点及其相邻流带进入高亮（`dispatchAction highlight`），再点空白处取消 |
+| A6 | 点「导出 PNG」 | 捕获 `Page.downloadWillBegin` 或返回 dataURL 长度 `> 200000`；文件名 `labor_income_<case>_<city>_<gross>.png`；图内可见标题/副标题/水印/标签 |
+| A7 | 点「导出 SVG」 | 下载成功；SVG 文本含 `<g transform="translate(0,96)">`、`font-size="30"`、`font-size="11"`（水印），且 `<text>` 数 ≥ 节点数 |
+| A8 | 改城市 / 拖滑杆 / 切视角 / 开占比 → 读 hash → 刷新 | 刷新后案例、城市、薪资、视角、占比全部还原；`#tlNow` 与刷新前一致 |
+| A9 | 键盘：Tab 到左栏格子按 Enter；Tab 到滑杆按 →/Home/End；打开说明弹窗按 Esc | 都能生效；`aria-pressed`/`aria-valuenow` 随状态更新；`role=dialog` 存在 |
+| A10 | 窄窗口（<768px）截图 | `#sankey` 高 520（<400px 时 480）；标签切到 13/11.5 紧凑字阶，不重叠 |
+
+## 6. 本阶段交付边界
+
+- 本阶段**只产出本文档**：`git show --stat b208ece` 显示新增 `research/ui-parity-audit.md`（另含此前未跟踪的 `.upstream/profitbridge-main/` 上游快照，与本文行号一一对应，便于复核）。
+- 我本人**没有改过** `ui/app.js`、`ui/index.html`、`ui/labor.js`；期间误改过一行 `--muted` 已用 edit 改回（`git checkout --` 被沙箱策略拒绝，见提交历史无 ui 变更）。
+- `ui/` 当前内容由上级代理用 `git subtree add` 导入（`01c5f6b` / `ad88ac8`），是上游原版，**不是**本文审计的那版手写实现。
