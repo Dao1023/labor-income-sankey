@@ -1,0 +1,31 @@
+# --- ignore-by-default: everything at root, then whitelist what belongs in the repo ---
+/*
+!/.gitattributes
+!/.gitignore
+!/README.md
+!/index.html
+!/app.js
+!/start.bat
+!/data/
+!/docs/
+!/scripts/
+!/tests/
+!/vendor/
+# audit records (reports are the artifact; screenshots stay local — reproducible via verify scripts)
+!/audits/
+/audits/**/*.png
+
+# tooling residue inside tests/ (screenshots, chrome profiles)
+/tests/.shots/
+/tests/.chrome/
+
+# os junk
+Thumbs.db
+*.log
+fetch_log.txt
+
+# test residue output dir
+/tests/out/
+
+# local data backups
+/data/**/*.bak
