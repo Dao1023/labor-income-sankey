@@ -73,6 +73,11 @@ body { background:var(--bg); color:var(--text); font-family:"Segoe UI","Microsof
 #chartPanel .in-title { text-align:center; padding:4px 16px 8px; font-size:clamp(20px, 2.05vw, 30px); line-height:1.2; font-weight:800; color:var(--title-blue); overflow-wrap:anywhere; }
 #sankey { width:100%; height:660px; display:block; }
 
+/* ---- 图例与公式带（图下方、滑杆上方） ---- */
+.chartLegend { display:flex; flex-wrap:wrap; align-items:center; gap:6px 16px; padding:0 26px 6px; font-size:12px; color:var(--muted); }
+.chartLegend i { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
+#formulaLine { padding:0 26px 6px; font-size:13px; line-height:1.5; color:var(--muted); text-align:left; font-variant-numeric:tabular-nums; }
+
 /* ---- bottom salary slider (upstream quarter timeline, same interaction skeleton) ---- */
 #timeline { padding:10px 26px 16px; }
 .tl-head { display:flex; justify-content:space-between; align-items:baseline; margin:0 30px 8px; font-size:12.5px; color:var(--muted); }
@@ -201,6 +206,8 @@ body { background:var(--bg); color:var(--text); font-family:"Segoe UI","Microsof
       <div class="meta" id="metaLine"></div>
       <div class="in-title" id="chartTitle"></div>
       <div id="sankey"></div>
+      <div class="chartLegend" id="chartLegend" aria-label="颜色图例"></div>
+      <div id="formulaLine"></div>
       <div id="timeline">
         <div class="tl-head"><span class="tl-cap">薪资档位</span><span class="tl-now"><b id="tlNow"></b><span class="tl-unit">/ 月</span></span></div>
         <div class="tl-track" id="tlTrack"><div class="tl-fill" id="tlFill"></div><div class="tl-thumb" id="tlThumb" role="slider" tabindex="0" aria-label="薪资档位" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext=""></div></div>
@@ -956,7 +963,7 @@ var Fr={},Gr={};var Wr,Hr=function(){function t(t,e,n){var i=this;this._sleepAft
     deduct: '#e29a3c',
     net: '#16a34a',
     acct: '#0ea5e9',
-    fund: '#0d9488',
+    fund: '#0ea5e9',
     pool: '#8b5cf6',
     tax: '#dc2626',
     agency: '#94a3b8',
@@ -1121,6 +1128,31 @@ var Fr={},Gr={};var Wr,Hr=function(){function t(t,e,n){var i=this;this._sleepAft
       dests[id].amount += amount;
     }
 
+    /* 去向节点的「钱归谁」：颜色编码之外，tooltip 再给一句话 */
+    var OWNER = {
+      't:net': '归你 · 已到手',
+      't:hf': '归你 · 账户锁定，可提取',
+      't:pacct': '归你 · 养老个人账户',
+      't:med': '归你 · 医保个人账户',
+      't:ann': '归你 · 年金账户',
+      't:ppool': '进统筹池 · 换取待遇',
+      't:medpool': '进统筹池 · 换取待遇',
+      't:unemp': '进统筹池 · 换取待遇',
+      't:injury': '进统筹池 · 换取待遇',
+      't:tax': '进国库 · 个税',
+      't:agency': '平台 / 中介拿走',
+      't:other': '其他扣缴合计'
+    };
+    /* 不足 1.2%（且低于 20 元）的落点并进「其他扣缴」，不留无标签的漂浮色块 */
+    var tinyThreshold = Math.max(20, pctBase * 0.012);
+    function target(id, label, color, amount) {
+      /* 单位成本视角的统筹池本身就有语义（工伤 0.3% 也得看得见），不参与合并 */
+      var keepPool = employerView && /^t:(ppool|medpool|unemp|injury)$/.test(id);
+      if (id !== 't:net' && !keepPool && amount < tinyThreshold) return ['t:other', '其他扣缴', PAL.agency];
+      return [id, label, color];
+    }
+    function ownerOf(id) { return OWNER[id] || ''; }
+
     /* ---------- 第 1 列：收入构成（按案例的 7 项拆分） ---------- */
     var grossRatio = revenue > 0 ? G / revenue : 1;
     (r.comps || []).forEach(function (cp, i) {
@@ -1168,19 +1200,20 @@ var Fr={},Gr={};var Wr,Hr=function(){function t(t,e,n){var i=this;this._sleepAft
         id: 'd:si', label: '社保个人 ' + pct1(siRate), v: P.pension + P.medical + P.unemp,
         base: '基数 ' + money(siBase) + ' × ' + pct1(siRate),
         dests: [['t:pacct', '养老个人账户', PAL.acct, P.pensionAcct],
-                ['t:ppool', '养老统筹', PAL.pool, P.pensionPool],
+                /* 统筹是单位缴的钱，个人视角只保留灵活就业「自缴 12%」那一档 */
+                ['t:ppool', '养老统筹（自缴 12%）', PAL.pool, P.pensionPool],
                 ['t:med', '医疗个人账户', PAL.acct, P.medical],
                 ['t:unemp', '失业统筹', PAL.pool, P.unemp]]
       },
       {
         id: 'd:hf', label: '公积金 ' + pct1(hfRate), v: P.hf,
         base: '基数 ' + money(hfBase) + ' × ' + pct1(hfRate),
-        dests: [['t:hf', '公积金账户', PAL.fund, P.hf]]
+        dests: [['t:hf', '公积金账户', PAL.acct, P.hf]]
       },
       {
         id: 'd:ann', label: '年金 ' + pct1(annRate), v: P.annuity,
         base: '基数 ' + money(G) + ' × ' + pct1(annRate),
-        dests: [['t:ann', '年金账户', PAL.fund, P.annuity]]
+        dests: [['t:ann', '年金账户', PAL.acct, P.annuity]]
       },
       {
         id: 'd:tax', label: '个税', v: P.tax,
@@ -1195,8 +1228,9 @@ var Fr={},Gr={};var Wr,Hr=function(){function t(t,e,n){var i=this;this._sleepAft
       flow('gross', id, it.v, PAL.deduct);
       it.dests.forEach(function (d) {
         if (!(d[3] > 0.004)) return;
-        flow(id, d[0], d[3], d[2]);
-        sink(d[0], d[1], d[2], d[3], 3);
+        var t = target(d[0], d[1], d[2], d[3]);
+        flow(id, t[0], d[3], t[2]);
+        sink(t[0], t[1], t[2], d[3], 3);
       });
     });
 
@@ -1214,27 +1248,41 @@ var Fr={},Gr={};var Wr,Hr=function(){function t(t,e,n){var i=this;this._sleepAft
       fill('unit', '单位缴纳', eTotal, 1, PAL.unit, 'top');
       flow('u:extra', 'unit', eTotal, PAL.unit);
 
+      /* 单位侧也做抽象：社保合成一条粗带（养老/医疗/失业/工伤），公积金、年金各一条。
+         五险明细只进 tooltip，避免四条细流从右下穿过个人流带。 */
+      var siBaseEr = r.siBase || G;
+      var erTip = '养老 ' + money(ER.pension) + ' · 医疗 ' + money(ER.medical) +
+                  ' · 失业 ' + money(ER.unemp) + ' · 工伤 ' + money(ER.injury);
       var parts = [
-        ['u:pension', '单位养老', ER.pension, 't:ppool', '养老统筹', PAL.pool],
-        ['u:medical', '单位医疗', ER.medical, 't:medpool', '医疗统筹', PAL.pool],
-        ['u:unemp', '单位失业', ER.unemp, 't:unemp', '失业统筹', PAL.pool],
-        ['u:injury', '单位工伤', ER.injury, 't:injury', '工伤统筹', PAL.pool],
-        ['u:hf', '单位公积金', ER.hf, 't:hf', '公积金账户', PAL.fund],
-        ['u:annuity', '单位年金', ER.annuity, 't:ann', '年金账户', PAL.fund],
-        ['u:agency', '中介服务费', ER.agency, 't:agency', '平台 / 中介', PAL.agency]
+        { id: 'u:si', label: '单位社保 ' + pct1(ER.si / siBaseEr), v: ER.si, tip: erTip,
+          dests: [['t:ppool', '养老统筹', PAL.pool, ER.pension],
+                  ['t:medpool', '医疗统筹', PAL.pool, ER.medical],
+                  ['t:unemp', '失业统筹', PAL.pool, ER.unemp],
+                  ['t:injury', '工伤统筹', PAL.pool, ER.injury]] },
+        { id: 'u:hf', label: '单位公积金 ' + pct1(r.hfRate || 0), v: ER.hf,
+          dests: [['t:hf', '公积金账户', PAL.acct, ER.hf]] },
+        { id: 'u:ann', label: '单位年金 ' + pct1(annRate), v: ER.annuity,
+          dests: [['t:ann', '年金账户', PAL.acct, ER.annuity]] },
+        { id: 'u:agency', label: '中介服务费', v: ER.agency,
+          dests: [['t:agency', '平台 / 中介', PAL.agency, ER.agency]] }
       ];
       parts.forEach(function (p) {
-        if (!(p[2] > 0.004)) return;
-        var id = fill(p[0], p[1], p[2], 2, PAL.unit, 'right');
+        if (!(p.v > 0.004)) return;
+        var id = fill(p.id, p.label, p.v, 2, PAL.unit, 'right');
         if (!id) return;
-        flow('unit', id, p[2], PAL.unit);
-        flow(id, p[3], p[2], p[5]);
-        sink(p[3], p[4], p[5], p[2], 3);
+        if (p.tip) nodes[nodes.length - 1].detailNote = p.tip;
+        flow('unit', id, p.v, PAL.unit);
+        p.dests.forEach(function (d) {
+          if (!(d[3] > 0.004)) return;
+          var tt = target(d[0], d[1], d[2], d[3]);
+          flow(id, tt[0], d[3], tt[2]);
+          sink(tt[0], tt[1], tt[2], d[3], 3);
+        });
       });
     }
 
     /* ---------- 去向列（钱归谁：到手 → 账户 → 统筹 → 国库 → 平台） ---------- */
-    var ORDER = ['t:net', 't:hf', 't:pacct', 't:med', 't:ann', 't:ppool', 't:medpool', 't:unemp', 't:injury', 't:tax', 't:agency'];
+    var ORDER = ['t:net', 't:hf', 't:pacct', 't:med', 't:ann', 't:ppool', 't:medpool', 't:unemp', 't:injury', 't:other', 't:tax', 't:agency'];
     destOrder.sort(function (a, b) {
       var ia = ORDER.indexOf(a), ib = ORDER.indexOf(b);
       return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
@@ -1245,15 +1293,15 @@ var Fr={},Gr={};var Wr,Hr=function(){function t(t,e,n){var i=this;this._sleepAft
       if (id === 't:net') {
         var hit = null;
         nodes.forEach(function (n) { if (n.name === 't:net') hit = n; });
-        if (hit) { hit.value = d.amount; hit.pct = pctOf(d.amount, pctBase); hit.pctLine = fmtPct(hit.pct) + ' ' + pctWord + ' · ' + money(d.amount); }
+        if (hit) { hit.value = d.amount; hit.ownerNote = ownerOf(id); hit.pct = pctOf(d.amount, pctBase); hit.pctLine = fmtPct(hit.pct) + ' ' + pctWord + ' · ' + money(d.amount); }
         return;
       }
-      fill(id, d.label, d.amount, 3, d.color, 'right');
+      if (fill(id, d.label, d.amount, 3, d.color, 'right')) nodes[nodes.length - 1].ownerNote = ownerOf(id);
     });
 
     /* ---------- 列内顺序：单位成本支干置顶，其次收入构成；扣缴 / 去向按固定次序 ---------- */
     var DORDER = ['d:si', 'd:hf', 'd:ann', 'd:tax'];
-    var UORDER = ['u:pension', 'u:medical', 'u:unemp', 'u:injury', 'u:hf', 'u:annuity', 'u:agency'];
+    var UORDER = ['u:si', 'u:hf', 'u:ann', 'u:agency'];
     function rankOf(n) {
       if (n.name === 'u:extra') return 0;
       if (n.name.indexOf('inc') === 0) return 10 + (+n.name.slice(3) || 0);
@@ -1494,6 +1542,7 @@ function renderChart() {
   const bundle = computeNow();
   window.__bundle = bundle;
   const g = buildGraph(bundle, state.view === 'cost');
+  renderLegend(g);
   window.__bridgeCheck = checkConsistency(bundle, g);
   window.__sankeyMeta = {
     caseId: state.caseId,
@@ -1535,14 +1584,17 @@ function renderChart() {
 
   const labelOf = new Map(g.nodes.map(n => [n.name, n.labelText]));
   const data = g.nodes.map(n => {
-    const d = { name: n.name, value: n.value, depth: n.depth, labelText: n.labelText, baseNote: n.baseNote, itemStyle: n.itemStyle };
+    const d = { name: n.name, value: n.value, depth: n.depth, labelText: n.labelText, baseNote: n.baseNote, ownerNote: n.ownerNote, detailNote: n.detailNote, itemStyle: n.itemStyle };
     let pos = 'top';
     if (n.depth === 0) pos = 'left';
     else if (n.depth >= 3) pos = 'right';
     d.label = { position: pos, distance: pos === 'top' ? 6 : 8, formatter: nodeLabel };
     /* 极小节点：标签（两行 37px）比色块还高，画出来只会互相压字。
        1.5% 以下不画标签——它的去向节点仍带名字和金额，信息不丢。 */
-    if (n.value < 2 || (pctBase > 0 && n.value / pctBase < 0.015)) d.label = { show: false };
+    if (n.name === 't:other') d.label = { position: 'bottom', distance: 6, formatter: nodeLabel };
+    else if (state.view === 'cost' && /^t:(ppool|medpool|unemp|injury)$/.test(n.name) && n.value >= 20) {
+      d.label = { position: 'right', distance: 8, formatter: nodeLabel };  /* 单位视角的统筹池：再小也要有名有姓 */
+    } else if (n.value < 2 || (pctBase > 0 && n.value / pctBase < 0.012)) d.label = { show: false };
     return d;
   });
 
@@ -1583,8 +1635,12 @@ function renderChart() {
         }
         const pc = pctBase > 0 ? p.value / pctBase * 100 : 0;
         const bn = p.data && p.data.baseNote;
+        const ow = p.data && p.data.ownerNote;
         return '<b>' + ((p.data && p.data.labelText) || labelName(p)) + '</b><br/>' + dispSym() + amtText(p.value) +
-          '<br/>' + fmtPct1(pc) + ' ' + pctWord + (bn ? '<br/><span style="color:#52607a">' + bn + '</span>' : '');
+          '<br/>' + fmtPct1(pc) + ' ' + pctWord +
+          (bn ? '<br/><span style="color:#52607a">' + bn + '</span>' : '') +
+          (ow ? '<br/><span style="color:#52607a">' + ow + '</span>' : '') +
+          (p.data && p.data.detailNote ? '<br/><span style="color:#52607a">' + p.data.detailNote + '</span>' : '');
       }
     },
     series: [series]
@@ -1852,12 +1908,26 @@ function renderMeta(bundle) {
   bits.push('社保 ' + bundle.meta.si);
   bits.push('应发 ' + money(r.gross) + '/月');
   if (r.revenue > r.gross + 0.5) bits.push('流水 ' + money(r.revenue) + '/月');
-  /* 公式带：位置与样式沿用上游 #segNotesLine / .segNote，内容换成逐项展开的算式。
-     每一项都来自引擎结果（r.*），口径说明（tag / caveat）挪到「口径说明」弹窗里。 */
-  const band = bundle.formula || '';
   document.getElementById('metaLine').innerHTML =
-    bits.map(b => '<span>' + b + '</span>').join(' · ') +
-    (band ? '<div class="segNote" id="segNotesLine">' + band + '</div>' : '');
+    bits.map(b => '<span>' + b + '</span>').join(' · ');
+}
+
+/* 公式带：图下方、滑杆上方的一行灰字，逐项展开税基与档位（数字全部来自引擎） */
+/* 图例按图上真实出现的颜色生成，没有「平台 / 中介」的案例就不显示那一项 */
+function renderLegend(g) {
+  const el = document.getElementById('chartLegend');
+  if (!el || !g) return;
+  const have = new Set(g.nodes.map(n => n.itemStyle && n.itemStyle.color));
+  const items = [['#16a34a', '你的现金'], ['#0ea5e9', '你的账户'], ['#8b5cf6', '共担池'],
+                 ['#dc2626', '税'], ['#94a3b8', '平台 / 中介 · 其他']];
+  el.innerHTML = items.filter(it => have.has(it[0]))
+    .map(it => '<span><i style="background:' + it[0] + '"></i>' + it[1] + '</span>').join('');
+}
+
+function renderFormula(bundle) {
+  const el = document.getElementById('formulaLine');
+  if (!el) return;
+  el.textContent = bundle.formula || '';
 }
 
 function renderControls() {
@@ -1890,6 +1960,7 @@ function render() {
   const bundle = computeNow();
   window.__bundle = bundle;
   renderMeta(bundle);
+  renderFormula(bundle);
   renderControls();
   renderLogoRail();
   renderTimeline();
