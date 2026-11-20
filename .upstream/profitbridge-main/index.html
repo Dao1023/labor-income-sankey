@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Profit Bridge · 利润析视</title>
+<style>
+:root {
+  --bg:#eef1f7; --card:#ffffff; --border:#e4e8f0; --text:#1e293b; --muted:#52607a;
+  --blue:#2563eb; --title-blue:#1d55a5; --green:#16a34a; --red:#dc2626; --cream:#f2efe9;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif; padding:20px 28px; }
+.layout { display:flex; gap:18px; align-items:stretch; }
+
+/* ---- left logo rail ----
+   absolutely sized to the main column's height (chart panel height), so rail +
+   chart share one top/bottom edge at any viewport width; the rail's own logo
+   grid scrolls internally and never drives the row height */
+.layout { position:relative; }
+#logoRail { position:absolute; top:0; bottom:0; left:0; width:132px; display:grid; grid-template-columns:1fr 1fr; gap:10px;
+  align-content:start; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px;
+  overflow-y:auto;
+  scrollbar-width:none; -ms-overflow-style:none; /* scrollable, scrollbar hidden */ }
+#logoRail::-webkit-scrollbar { display:none; }
+/* white cell + hairline ring via inset box-shadow (zero layout impact, unlike a
+   border) so JPG white-background logos sit on a clean matching surface */
+.logo { position:relative; border:2px solid transparent; border-radius:10px; background:#fff;
+  box-shadow:inset 0 0 0 1px rgba(100,116,139,.28);
+  cursor:pointer; padding:6px; display:flex; align-items:center; justify-content:center; transition:border-color .15s, background .15s, transform .1s; }
+.logo:hover { border-color:#b9c6dd; transform:translateY(-1px); box-shadow:inset 0 0 0 1px rgba(100,116,139,.45); }
+.logo.active { border-color:var(--blue); background:#e8effc; box-shadow:inset 0 0 0 1px rgba(37,99,235,.55); }
+.logo.preview { border-style:dashed; }
+.pvBadge { position:absolute; top:-7px; right:-5px; background:#7c3aed; color:#fff; font-size:8.5px; font-weight:700;
+  padding:1px 4px; border-radius:5px; letter-spacing:.4px; }
+/* fixed aspect-ratio + placeholder background: the img box never collapses
+   while loading, so the rail cannot shift when logos finish loading */
+.logo img { width:100%; aspect-ratio:1; object-fit:contain; display:block; border-radius:6px; background:#fff; }
+.logo .mono { width:100%; aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+  font-weight:800; font-size:18px; color:#fff; border-radius:6px; }
+
+/* ---- row 2: logo rail (left) + chart (right) ---- */
+.main { flex:1; min-width:0; margin-left:150px; } /* 132px rail + 18px gap */
+/* ---- row 1: industry filter (left) + controls (right); fixed-height toolbar ---- */
+.toolbar { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px; }
+.toolbar .left { display:flex; align-items:center; gap:14px; min-width:0; }
+#brand { font-size:20px; font-weight:800; color:var(--title-blue); white-space:nowrap; }
+.controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+/* Header is a normal FLOW stack inside #chartPanel: meta on its own row, the 32px title
+   on the next row. Previously .meta was absolutely overlaid at top:8px and .in-title used a
+   fixed padding-top, so long company/segment titles ran straight through the meta text.
+   padding-right on .meta reserves the dropdown's lane (#barSelect) so the two never collide. */
+.meta { position:static; font-size:11px; color:var(--muted); text-align:left; line-height:1.5;
+  padding:8px 250px 0 14px; min-height:36px; }
+.meta a { color:var(--blue); pointer-events:auto; }
+/* segment-disclosure notes: an independent small-gray row under the two meta
+   lines. Shows at most 2 lines then ellipsizes; the full text lives in title.
+   It is a normal flow row inside .meta, so it can never overlap #chartTitle. */
+.segNote { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+  overflow:hidden; margin-top:2px; }
+/* derived/estimated period badge (C1 honesty: rows reconstructed by differencing) */
+.estBadge { display:inline-block; font-size:9.5px; font-weight:700; color:#b45309; background:#fef3c7;
+  border:1px solid #fcd34d; border-radius:4px; padding:0 4px; margin-left:5px; vertical-align:1px; }
+/* transient toast: quarter realignment notices on company switch */
+#hintToast { position:fixed; left:50%; bottom:34px; transform:translateX(-50%) translateY(8px); background:#1e293b; color:#fff;
+  font-size:12.5px; padding:8px 16px; border-radius:8px; opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:50; box-shadow:0 4px 14px rgba(30,41,59,.25); }
+#hintToast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+#btnLang, #btnCur { background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px 14px; font-size:13px; cursor:pointer; }
+#btnLang:hover, #btnCur:hover { border-color:var(--blue); }
+#btnCur.active { border-color:var(--blue); color:var(--blue); background:#e8effc; }
+.exportGroup { display:flex; background:var(--card); border:1px solid #d8dee9; border-radius:10px; overflow:hidden; box-shadow:0 1px 3px rgba(30,41,59,.06); }
+.exportGroup button { appearance:none; border:none; background:transparent; color:var(--text); padding:9px 18px;
+  font-size:13.5px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:7px; transition:background .15s, color .15s; }
+.exportGroup button + button { border-left:1px solid #e4e8f0; }
+.exportGroup button:hover { background:#e8effc; color:var(--title-blue); }
+.exportGroup button:active { background:#dbe7fa; }
+.exportGroup svg { width:15px; height:15px; }
+.exportGroup button.active { background:#dbe7fa; color:var(--title-blue); }
+.exportGroup button.active:hover { background:#cfe0f8; }
+#barSelect:hover { border-color:var(--blue); }
+#barSelect option:disabled { color:#b6bfcc; }
+/* bar-view cumulative-basis note: fixed-height chip, absolutely positioned so showing/
+   hiding it (visibility only) never shifts the chart plot or the timeline → no layout jump.
+   Hidden entirely — taking no layout space — when a series has no H1/9M cumulative bars. */
+.barBasisNote { position:absolute; left:50%; top:62px; transform:translateX(-50%); z-index:6;
+  height:20px; display:flex; align-items:center; gap:7px; padding:0 12px; border-radius:10px;
+  font-size:12px; color:#475569; background:rgba(255,255,255,.85); border:1px solid #e2e8f0;
+  box-shadow:0 1px 3px rgba(30,41,59,.06); white-space:nowrap; pointer-events:none; visibility:hidden; }
+.barBasisNote.show { visibility:visible; }
+.barBasisNote::before { content:''; width:14px; height:11px; border-radius:2px; border:1px solid #cbd5e1;
+  background:repeating-linear-gradient(-45deg,#94a3b8 0 2px,transparent 2px 5px); }
+
+#chartPanel { background:var(--cream); border:1px solid var(--border); border-radius:10px; position:relative; overflow:hidden; }
+#chartPanel .in-title { text-align:center; padding:4px 16px 8px; font-size:clamp(20px, 2.05vw, 30px); line-height:1.2; font-weight:800; color:var(--title-blue); overflow-wrap:anywhere; }
+#sankey { width:100%; height:660px; display:block; }
+/* metric dropdown: absolute overlay top-right of the chart — appearing/disappearing
+   never shifts the toolbar row (fixes the whole-row button jump) */
+#barSelect { position:absolute; top:6px; right:12px; z-index:6; appearance:auto; background:var(--card); color:var(--text); border:1px solid #d8dee9; border-radius:10px;
+  padding:8px 12px; font-size:13.5px; font-weight:600; cursor:pointer; box-shadow:0 1px 3px rgba(30,41,59,.06); max-width:230px; }
+
+/* ---- bottom timeline ---- */
+#timeline { padding:10px 26px 16px; }
+.tl-track { position:relative; height:6px; background:#dfe3ec; border-radius:3px; margin:0 30px; }
+/* invisible vertical extension — a 6px track is hard to hit; a pointerdown
+   anywhere in this band jumps to the nearest quarter */
+.tl-track::before { content:''; position:absolute; left:0; right:0; top:-14px; bottom:-14px; }
+.tl-fill { position:absolute; left:0; top:0; bottom:0; background:var(--blue); border-radius:3px; }
+.tl-thumb { position:absolute; top:50%; width:20px; height:20px; border-radius:50%; background:#fff;
+  border:3px solid var(--blue); box-shadow:0 1px 4px rgba(30,41,59,.25); transform:translate(-50%,-50%); cursor:grab; }
+.tl-thumb:active { cursor:grabbing; }
+.tl-ticks { display:flex; justify-content:space-between; margin:10px 30px 0; }
+.tl-tick { flex:0 0 auto; text-align:center; cursor:pointer; color:var(--muted); font-size:12.5px; line-height:1.35; user-select:none; position:relative; }
+/* generous invisible hit area around each tick label — easy to hit without
+   changing the visible layout. Horizontal expansion is deliberately 0: a fixed
+   ±18px box is 36px wide, so whenever ticks sit closer than 36px (every width
+   below ~1280) the NEXT sibling covers the previous label's centre and clicks
+   silently select the following year. Extending only vertically keeps every
+   tick's hit box inside its own label, so a click always lands on the year the
+   reader aimed at; #tlTicks' delegated click handler adds a nearest-centre
+   fallback for the active tick's wider date caption. */
+.tl-tick::before { content:''; position:absolute; inset:-8px 0; }
+.tl-tick .q { font-weight:600; }
+.tl-tick:hover .q { color:var(--blue); }
+.tl-tick.active .q { color:var(--blue); font-weight:800; }
+.tl-tick.active .d { color:var(--text); font-weight:600; }
+.tl-tick .d { font-size:11px; color:#52607a; }
+.tl-tick.active { transform:scale(1.06); }
+.tl-tick { transition:transform .12s; }
+/* snap dots: one landing point per quarter, semi-transparent; nearest one
+   highlighted while dragging so the user sees where the thumb will land */
+.tl-dot { position:absolute; top:50%; width:2px; height:12px; background:rgba(30,41,59,.15);
+  transform:translate(-50%,-50%); border-radius:1px; pointer-events:none;
+  transition:background .1s, width .1s, height .1s; }
+#timeline.hover .tl-dot, #timeline.dragging .tl-dot { background:rgba(30,41,59,.32); }
+.tl-dot.near, #timeline.dragging .tl-dot.near, #timeline.hover .tl-dot.near { background:var(--blue); width:4px; height:20px; }
+#timeline.hover .tl-thumb { box-shadow:0 0 0 6px rgba(37,99,235,.12), 0 1px 4px rgba(30,41,59,.25); }
+
+/* bottom meta row removed: source/updated moved to .meta overlay top-right */
+
+/* ---- industry filter bar ---- */
+#industryBar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; min-width:0; }
+#industryBar .lbl { font-size:12.5px; color:var(--muted); font-weight:600; margin-right:2px; }
+.indBtn { appearance:none; border:1px solid #d8dee9; background:var(--card); color:var(--text);
+  border-radius:999px; padding:5px 13px; font-size:12.5px; font-weight:600; cursor:pointer;
+  transition:background .15s, color .15s, border-color .15s; }
+.indBtn:hover { border-color:var(--blue); color:var(--title-blue); }
+.indBtn.active { background:#dbe7fa; border-color:var(--blue); color:var(--title-blue); }
+.indBtn .cnt { color:#475569; font-weight:600; font-size:11px; margin-left:5px; }
+.logo.hidden { display:none; }
+
+@media (max-width: 900px) {
+  .layout { flex-direction:column; }
+  #logoRail { position:static; width:100%; grid-template-columns:repeat(10,1fr); }
+  .main { margin-left:0; }
+  /* the timeline gets the panel's full width: 26px side padding + 30px tick
+     margins ate 112px of a 332px panel, which was what pushed 9 years outside
+     the clip in the first place */
+  #timeline { padding:8px 10px 12px; }
+  .tl-ticks { margin:10px 4px 0; }
+  /* last-resort horizontal scroll (e.g. a 320px viewport where even the
+     thinned set cannot fit); hidden scrollbar, the row still pans by drag */
+  .tl-ticks.scrollable { overflow-x:auto; overflow-y:visible; scrollbar-width:none; padding-bottom:2px; }
+  .tl-ticks.scrollable::-webkit-scrollbar { display:none; }
+}
+@media (max-width: 480px) {
+  /* the full date caption is ~65px wide, wider than a 30-40px tick slot at this
+     width; the title already states the quarter, so drop it instead of letting
+     it paint over the neighbouring years */
+  .tl-tick .d { display:none; }
+}
+/* ---- phone layout (≤768) ----
+   The 92-logo rail used to occupy 334px of the first screen, the 250px meta
+   right lane squeezed the disclosure text into a 68px column, and the toolbar
+   wrapped to 289px — the sankey did not start until y=885 on a 390×844 phone.
+   Rail is collapsed behind a count button by default, toolbar/industry filter
+   become single compact rows, and the chart starts inside the first screen. */
+#logoToggle { display:none; }
+@media (max-width: 768px) {
+  body { padding:10px 10px 16px; }
+  .toolbar { gap:8px; margin-bottom:8px; }
+  .toolbar .left { flex:1 1 100%; gap:8px; flex-wrap:nowrap; min-width:0; }
+  #brand { font-size:17px; }
+  #industryBar { flex:1 1 auto; flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-x:contain;
+    scrollbar-width:none; -ms-overflow-style:none; padding-bottom:2px; }
+  #industryBar::-webkit-scrollbar { display:none; }
+  #industryBar .lbl { display:none; }
+  .indBtn { flex:0 0 auto; padding:4px 10px; font-size:12px; }
+  .controls { flex:1 1 100%; gap:6px; }
+  #btnLang, #btnCur { padding:6px 10px; font-size:12px; }
+  .exportGroup button { padding:7px 10px; font-size:12px; gap:4px; }
+  .exportGroup svg { width:13px; height:13px; }
+  .layout { gap:8px; }
+  /* collapsible company rail: a single horizontally scrollable strip when open */
+  #logoToggle { display:flex; align-items:center; gap:6px; align-self:flex-start;
+    appearance:none; border:1px solid #d8dee9; background:var(--card); color:var(--text);
+    border-radius:999px; padding:6px 12px; font-size:12.5px; font-weight:700; cursor:pointer; }
+  #logoToggle .caret { color:var(--blue); font-size:10px; }
+  #logoRail { display:none; }
+  #logoRail.open { display:flex; gap:8px; overflow-x:auto; overflow-y:hidden; padding:8px;
+    scrollbar-width:thin; }
+  #logoRail.open .logo { flex:0 0 54px; }
+  .meta { padding:6px 12px 0; min-height:0; }
+  /* the metric dropdown sits in the header flow instead of over the meta text */
+  #barSelect { position:static; margin:6px 12px 0; align-self:flex-start; max-width:calc(100% - 24px); }
+  #chartPanel .in-title { padding:2px 12px 6px; }
+  #sankey { height:520px; }
+  #timeline { padding:6px 8px 10px; }
+}
+@media (max-width: 400px) {
+  #sankey { height:480px; }
+}
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <div class="left">
+    <span id="brand"></span>
+    <div id="industryBar"></div>
+  </div>
+  <div class="controls">
+    <div class="exportGroup" id="viewGroup">
+      <button id="btnViewBridge"><span id="lblViewBridge"></span></button>
+      <button id="btnViewBar"><span id="lblViewBar"></span></button>
+    </div>
+    <div class="exportGroup" id="modeGroup">
+      <button id="btnPct"><span id="lblPct"></span></button>
+      <button id="btnQoQ"><span id="lblQoQ"></span></button>
+    </div>
+    <div class="exportGroup">
+      <button id="btnExportPNG"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span id="lblExportPNG"></span></button>
+      <button id="btnExportSVG"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span id="lblExportSVG"></span></button>
+    </div>
+    <button id="btnCur" style="display:none"></button>
+    <button id="btnLang"></button>
+  </div>
+</div>
+<div class="layout">
+  <button id="logoToggle" type="button" aria-controls="logoRail" aria-expanded="false"><span id="logoCount"></span><span class="caret">▾</span></button>
+  <div id="logoRail"></div>
+  <div class="main">
+    <div id="chartPanel">
+      <div class="meta" id="metaLine"></div>
+      <div class="in-title" id="chartTitle"></div>
+      <select id="barSelect" style="display:none"></select>
+      <div id="sankey"></div>
+      <div id="barBasisNote" class="barBasisNote"></div>
+      <div id="timeline">
+        <div class="tl-track"><div class="tl-fill" id="tlFill"></div><div class="tl-thumb" id="tlThumb"></div></div>
+        <div class="tl-ticks" id="tlTicks"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="vendor/echarts.min.js"></script>
+<!-- data/profit.json.js (566KB inline payload) is NOT loaded here: app.js fetches
+     data/profit.json normally and only injects this file on demand when fetch fails
+     (file:// double-click / offline), so HTTP visitors no longer download it eagerly. -->
+<script src="app.js"></script>
+</body>
+</html>

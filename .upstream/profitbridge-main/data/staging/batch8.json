@@ -1,0 +1,241 @@
+{
+  "_meta": {
+    "batch": 8,
+    "description": "A股 2026 Q3 三季报单季追加（贵州茅台/TCL科技/长鑫存储）+ 长鑫存储 2025-09-30/2025-12-31 历史 gross/opInc/rd/sga 补齐。数值来自东财 F10 RPT_F10_FINANCE_GINCOME 累计差分（revenue=TOTAL_OPERATE_INCOME, gross=rev−OPERATE_COST, opInc=OPERATE_PROFIT, netInc=PARENT_NETPROFIT, rd=RESEARCH_EXPENSE, sga=SALE_EXPENSE+MANAGE_EXPENSE）。stage1 只对目标 ticker/期点追加或补空，绝不改写既有数值。",
+    "generatedAt": "2026-10-31",
+    "sources": [
+      "tmp-season-cn/recompute_out.json",
+      "tmp-season-cn/cx_history_out.json"
+    ],
+    "shape": "{ results: [ { ticker, name, currency, notice_date, report_type, newQuarters:[quarter] } ], enrich: [ { ticker, end, expectRevenue, set:{gross,opInc,rd,sga} } ] }",
+    "fxNote": "fxToUsd 0.14915 USD/CNY @2026-09-30（与 batch7 同日 A 股一致，verbatim）。",
+    "periodTypeNote": "A股 9M 累计差分单季 => periodType q。",
+    "enrichNote": "仅当目标期点 revenue 与 expectRevenue 偏差≤0.5% 且目标字段当前为空时补入；不覆盖既有值。",
+    "usNote": "2026-11-06 追加 7 家美股 2026 Q3/财年新期（U/AMD/DUOL/MSI/QCOM/AAPL/PLTR）。数值取自 tmp-verify-20261106/verified.json（SEC companyfacts 独立复核，站内口径 USD $M，tax 取 XBRL IncomeTaxExpenseBenefit）；QCOM/AAPL 为 10-K 财年末 Q4 = FY − Q1 − Q2 − Q3 派生（QCOM: 43120−32798=10322；AAPL: 478834−364357=114477），不用年度原值。美股行按站内惯例不写 periodType / fxToUsd；U/DUOL/PLTR 无合并 SG&A（只有 G&A），sga 显式 null，不拿 G&A 顶替。"
+  },
+  "results": [
+    {
+      "ticker": "600519.SS",
+      "name": "贵州茅台",
+      "currency": "CNY-M",
+      "notice_date": "2026-10-31 00:00:00",
+      "report_type": "三季报",
+      "currency_raw": "CNY",
+      "newQuarters": [
+        {
+          "end": "2026-09-30",
+          "revenue": 41005.58,
+          "netInc": 19950.55,
+          "periodType": "q",
+          "fxToUsd": 0.14915,
+          "derivation": "diff",
+          "gross": 36833.62,
+          "opInc": 27568.55,
+          "rd": 32.73,
+          "sga": 3311.59
+        }
+      ]
+    },
+    {
+      "ticker": "000100.SZ",
+      "name": "TCL科技",
+      "currency": "CNY-M",
+      "notice_date": "2026-10-31 00:00:00",
+      "report_type": "三季报",
+      "currency_raw": "CNY",
+      "newQuarters": [
+        {
+          "end": "2026-09-30",
+          "revenue": 50069.57,
+          "netInc": 1312.17,
+          "periodType": "q",
+          "fxToUsd": 0.14915,
+          "derivation": "diff",
+          "gross": 5592.55,
+          "opInc": 209.23,
+          "rd": 2392.29,
+          "sga": 1586.14
+        }
+      ]
+    },
+    {
+      "ticker": "688825.SS",
+      "name": "长鑫存储",
+      "currency": "CNY-M",
+      "notice_date": "2026-10-31 00:00:00",
+      "report_type": "三季报",
+      "currency_raw": "CNY",
+      "newQuarters": [
+        {
+          "end": "2026-09-30",
+          "revenue": 118714.03,
+          "netInc": 54434.83,
+          "periodType": "q",
+          "fxToUsd": 0.14915,
+          "derivation": "diff",
+          "gross": 106279.02,
+          "opInc": 99039.47,
+          "rd": 3193.32,
+          "sga": 969.45
+        }
+      ]
+    },
+    {
+      "ticker": "U",
+      "name": "UNITY SOFTWARE INC.",
+      "currency": "USD-M",
+      "report_type": "10-Q",
+      "notice_date": "2026-11-05",
+      "newQuarters": [
+        {
+          "end": "2026-09-30",
+          "revenue": 622.1,
+          "gross": 509.6,
+          "opInc": 100.6,
+          "netInc": 121.2,
+          "rd": 251.1,
+          "sga": null,
+          "tax": -2.7
+        }
+      ]
+    },
+    {
+      "ticker": "AMD",
+      "name": "ADVANCED MICRO DEVICES INC",
+      "currency": "USD-M",
+      "report_type": "10-Q",
+      "notice_date": "2026-11-04",
+      "newQuarters": [
+        {
+          "end": "2026-09-26",
+          "revenue": 13377,
+          "gross": 7210,
+          "opInc": 2832,
+          "netInc": 2428,
+          "rd": 2803,
+          "sga": 1298,
+          "tax": -555
+        }
+      ]
+    },
+    {
+      "ticker": "DUOL",
+      "name": "Duolingo, Inc.",
+      "currency": "USD-M",
+      "report_type": "10-Q",
+      "notice_date": "2026-11-04",
+      "newQuarters": [
+        {
+          "end": "2026-09-30",
+          "revenue": 309,
+          "gross": 225.1,
+          "opInc": 24.2,
+          "netInc": 27.2,
+          "rd": 107.7,
+          "sga": null,
+          "tax": 8.4
+        }
+      ]
+    },
+    {
+      "ticker": "MSI",
+      "name": "Motorola Solutions, Inc.",
+      "currency": "USD-M",
+      "report_type": "10-Q",
+      "notice_date": "2026-11-04",
+      "newQuarters": [
+        {
+          "end": "2026-10-03",
+          "revenue": 3376,
+          "gross": 1768,
+          "opInc": 777,
+          "netInc": 512,
+          "rd": 276,
+          "sga": 504,
+          "tax": 164
+        }
+      ]
+    },
+    {
+      "ticker": "QCOM",
+      "name": "QUALCOMM INC/DE",
+      "currency": "USD-M",
+      "report_type": "10-K",
+      "notice_date": "2026-11-04",
+      "newQuarters": [
+        {
+          "end": "2026-09-27",
+          "revenue": 10322,
+          "gross": 5238,
+          "opInc": 1357,
+          "netInc": 1252,
+          "rd": 2684,
+          "sga": 962,
+          "tax": -79
+        }
+      ]
+    },
+    {
+      "ticker": "AAPL",
+      "name": "Apple Inc.",
+      "currency": "USD-M",
+      "report_type": "10-K",
+      "notice_date": "2026-11-03",
+      "newQuarters": [
+        {
+          "end": "2026-09-26",
+          "revenue": 114477,
+          "gross": 54820,
+          "opInc": 35631,
+          "netInc": 30711,
+          "rd": 11730,
+          "sga": 7459,
+          "tax": 5424
+        }
+      ]
+    },
+    {
+      "ticker": "PLTR",
+      "name": "Palantir Technologies Inc.",
+      "currency": "USD-M",
+      "report_type": "10-Q",
+      "notice_date": "2026-11-03",
+      "newQuarters": [
+        {
+          "end": "2026-09-30",
+          "revenue": 2313.4,
+          "gross": 1930.1,
+          "opInc": 1084.8,
+          "netInc": 1128,
+          "rd": 219.7,
+          "sga": null,
+          "tax": 13.6
+        }
+      ]
+    }
+  ],
+  "enrich": [
+    {
+      "ticker": "688825.SS",
+      "end": "2025-09-30",
+      "expectRevenue": 16645.74,
+      "set": {
+        "gross": 5825.68,
+        "opInc": -1874.93,
+        "rd": 2737.72,
+        "sga": 5031.81
+      }
+    },
+    {
+      "ticker": "688825.SS",
+      "end": "2025-12-31",
+      "expectRevenue": 29715.65,
+      "set": {
+        "gross": 17501.19,
+        "opInc": 13689.34,
+        "rd": 3194.81,
+        "sga": 814.29
+      }
+    }
+  ]
+}

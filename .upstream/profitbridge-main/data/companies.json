@@ -1,0 +1,1644 @@
+[
+  {
+    "ticker": "000063.SZ",
+    "nameZh": "中兴通讯",
+    "nameEn": "中兴通讯",
+    "color": "#283593",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "000100.SZ",
+    "nameZh": "TCL科技",
+    "nameEn": "TCL科技",
+    "color": "#7b1fa2",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "000333.SZ",
+    "nameZh": "美的集团",
+    "nameEn": "美的集团",
+    "color": "#2e7d32",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "000660.KS",
+    "nameZh": "SK海力士",
+    "nameEn": "SK hynix",
+    "color": "#ea002c",
+    "frequency": "mixed",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "00100.HK",
+    "nameZh": "MiniMax",
+    "nameEn": "MiniMax Group",
+    "color": "#e91e63",
+    "frequency": "hk-mixed",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "00151.HK",
+    "nameZh": "中国旺旺",
+    "nameEn": "Want Want",
+    "color": "#d32f2f",
+    "fiscalYearEndMonth": 3
+  },
+  {
+    "ticker": "002415.SZ",
+    "nameZh": "海康威视",
+    "nameEn": "海康威视",
+    "color": "#ef6c00",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "002594.SZ",
+    "nameZh": "比亚迪",
+    "nameEn": "比亚迪",
+    "color": "#1565c0",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "005930.KS",
+    "nameZh": "三星电子",
+    "nameEn": "Samsung Electronics",
+    "color": "#1428a0",
+    "frequency": "mixed",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "00700.HK",
+    "nameZh": "腾讯控股",
+    "nameEn": "Tencent",
+    "color": "#1d55a5",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "00728.HK",
+    "nameZh": "中国电信",
+    "nameEn": "China Telecom",
+    "color": "#1565c0",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "00762.HK",
+    "nameZh": "中国联通",
+    "nameEn": "China Unicom",
+    "color": "#e65100",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "00941.HK",
+    "nameZh": "中国移动",
+    "nameEn": "China Mobile",
+    "color": "#0277bd",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "00981.HK",
+    "nameZh": "中芯国际",
+    "nameEn": "SMIC",
+    "color": "#37474f",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "00992.HK",
+    "nameZh": "联想集团",
+    "nameEn": "Lenovo",
+    "color": "#e2231a",
+    "notes": "口径特殊：三月财年(3-31)，分部为全年累计、利润为单季Q4，分部合计约为营收4倍；详见 docs/KNOWN_CAVEATS.md。",
+    "fiscalYearEndMonth": 3
+  },
+  {
+    "ticker": "01024.HK",
+    "nameZh": "快手",
+    "nameEn": "Kuaishou",
+    "color": "#ff4906",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "01398.HK",
+    "nameZh": "工商银行",
+    "nameEn": "ICBC",
+    "color": "#c62828",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "01810.HK",
+    "nameZh": "小米集团",
+    "nameEn": "Xiaomi",
+    "color": "#ff6900",
+    "frequency": "hk-mixed",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "02097.HK",
+    "nameZh": "蜜雪集团",
+    "nameEn": "Mixue",
+    "color": "#c62828",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "02513.HK",
+    "nameZh": "智谱",
+    "nameEn": "Z.AI",
+    "color": "#3f51b5",
+    "frequency": "hk-mixed",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "03690.HK",
+    "nameZh": "美团",
+    "nameEn": "Meituan",
+    "color": "#ffc300",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "03888.HK",
+    "nameZh": "金山软件",
+    "nameEn": "Kingsoft",
+    "color": "#283593",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "03968.HK",
+    "nameZh": "招商银行",
+    "nameEn": "China Merchants Bank",
+    "color": "#b71c1c",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "066570.KS",
+    "nameZh": "LG电子",
+    "nameEn": "LG Electronics",
+    "color": "#a50034",
+    "frequency": "mixed",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "09633.HK",
+    "nameZh": "农夫山泉",
+    "nameEn": "Nongfu Spring",
+    "color": "#2e7d32",
+    "frequency": "hk-mixed",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "2330.TW",
+    "nameZh": "台积电",
+    "nameEn": "TSMC (TWSE)",
+    "color": "#c8102e",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "2454.TW",
+    "nameZh": "联发科",
+    "nameEn": "MediaTek",
+    "color": "#f0a000",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "300750.SZ",
+    "nameZh": "宁德时代",
+    "nameEn": "宁德时代",
+    "color": "#37474f",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "600519.SS",
+    "nameZh": "贵州茅台",
+    "nameEn": "贵州茅台",
+    "color": "#c62828",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "600887.SS",
+    "nameZh": "伊利股份",
+    "nameEn": "伊利股份",
+    "color": "#f9a825",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "601360.SS",
+    "nameZh": "三六零(360安全)",
+    "nameEn": "三六零(360安全)",
+    "color": "#d84315",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "688256.SS",
+    "nameZh": "寒武纪",
+    "nameEn": "寒武纪",
+    "color": "#00695c",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "688795.SS",
+    "nameZh": "摩尔线程",
+    "nameEn": "摩尔线程",
+    "color": "#6a1b9a",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "688825.SS",
+    "nameZh": "长鑫存储",
+    "nameEn": "长鑫存储",
+    "color": "#00838f",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "688981.SS",
+    "nameZh": "中芯国际A股",
+    "nameEn": "中芯国际A股",
+    "color": "#455a64",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "AAPL",
+    "cik": 320193,
+    "nameZh": "苹果",
+    "nameEn": "Apple Inc.",
+    "color": "#b91c1c",
+    "reports": [
+      "net sales disaggregated by significant products",
+      "disaggregated net sales",
+      "products and services performance",
+      "segment.*details"
+    ],
+    "segmentMap": [
+      [
+        "^iphone",
+        "iPhone",
+        null
+      ],
+      [
+        "^mac$",
+        "Mac",
+        null
+      ],
+      [
+        "^ipad",
+        "iPad",
+        null
+      ],
+      [
+        "^wearables",
+        "Wearables, Home and Accessories",
+        null
+      ],
+      [
+        "^services",
+        "Services",
+        null
+      ],
+      [
+        "^americas|^europe|^greater china|^japan|^rest of asia pacific",
+        null,
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 9
+  },
+  {
+    "ticker": "ADBE",
+    "cik": 796343,
+    "nameZh": "奥多比",
+    "nameEn": "Adobe Inc.",
+    "color": "#fa0f00",
+    "reports": [
+      "segment.*details",
+      "revenue.*disaggregat"
+    ],
+    "segmentMap": [
+      [
+        "^americas",
+        "Americas",
+        null
+      ],
+      [
+        "^emea",
+        "EMEA",
+        null
+      ],
+      [
+        "^apac",
+        "APAC",
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 11
+  },
+  {
+    "ticker": "AMD",
+    "cik": 2488,
+    "nameZh": "超威半导体",
+    "nameEn": "Advanced Micro Devices, Inc.",
+    "color": "#1e40af",
+    "reports": [
+      "segment"
+    ],
+    "segmentMap": [
+      [
+        "^client and gaming (client|gaming)$",
+        null,
+        null
+      ],
+      [
+        "^client and gaming",
+        "Client and Gaming",
+        null
+      ],
+      [
+        "^data center",
+        "Data Center",
+        null
+      ],
+      [
+        "^gaming",
+        "Gaming",
+        null
+      ],
+      [
+        "^client",
+        "Client",
+        null
+      ],
+      [
+        "^embedded",
+        "Embedded",
+        null
+      ],
+      [
+        "^all other",
+        "All Other",
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "AMZN",
+    "cik": 1018724,
+    "nameZh": "亚马逊",
+    "nameEn": "Amazon.com, Inc.",
+    "color": "#c2410c",
+    "reports": [
+      "segment"
+    ],
+    "segmentMap": [
+      [
+        "^north america",
+        "North America",
+        null
+      ],
+      [
+        "^international",
+        "International",
+        null
+      ],
+      [
+        "^aws$|aws segment|amazon web services",
+        "AWS",
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "ARM",
+    "cik": 1973239,
+    "nameZh": "安谋",
+    "nameEn": "Arm Holdings plc",
+    "color": "#0091bd",
+    "frequency": "mixed",
+    "notes": "口径差异：部分年度营业利润含研发/销售管理之外的其他经营费用（股份支付、一次性费用），毛利-研发-销售管理偏差≤约1.8%；详见 docs/KNOWN_CAVEATS.md。",
+    "fiscalYearEndMonth": 3
+  },
+  {
+    "ticker": "ASML",
+    "cik": 937966,
+    "nameZh": "阿斯麦",
+    "nameEn": "ASML Holding N.V.",
+    "color": "#0d1e8c",
+    "frequency": "mixed",
+    "notes": "口径差异：少数年度毛利与营业利润之间存在其他经营收益（参股/汇兑等），偏差约2%~3%；详见 docs/KNOWN_CAVEATS.md。",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "AVGO",
+    "cik": 1730168,
+    "nameZh": "博通",
+    "nameEn": "Broadcom Inc.",
+    "color": "#c026d3",
+    "reports": [
+      "segment",
+      "revenue.*disaggregation"
+    ],
+    "segmentMap": [
+      [
+        "semiconductor solutions",
+        "Semiconductor solutions",
+        null
+      ],
+      [
+        "infrastructure software",
+        "Infrastructure software",
+        null
+      ],
+      [
+        "ip licensing",
+        "IP licensing",
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 11
+  },
+  {
+    "ticker": "BABA",
+    "cik": 1577552,
+    "nameZh": "阿里巴巴",
+    "nameEn": "Alibaba Group Holding Limited",
+    "color": "#ff6a00",
+    "frequency": "mixed",
+    "reports": [
+      "segment.*details",
+      "segment information"
+    ],
+    "segmentMap": [
+      [
+        "taobao|tmall|china commerce",
+        "Taobao and Tmall Group",
+        null
+      ],
+      [
+        "cloud intelligence|^cloud",
+        "Cloud Intelligence Group",
+        null
+      ],
+      [
+        "cainiao",
+        "Cainiao",
+        null
+      ],
+      [
+        "international digital commerce|a ldc|alibaba international",
+        "Alibaba International Digital Commerce",
+        null
+      ],
+      [
+        "local services",
+        "Local Services Group",
+        null
+      ],
+      [
+        "digital media and entertainment",
+        "Digital Media and Entertainment",
+        null
+      ],
+      [
+        "^all others|^others$",
+        "All others",
+        null
+      ],
+      [
+        "unallocated|reconciling|intersegment|elimination",
+        null,
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 3
+  },
+  {
+    "ticker": "BIDU",
+    "cik": 1329099,
+    "nameZh": "百度",
+    "nameEn": "Baidu, Inc.",
+    "color": "#2932e1",
+    "frequency": "mixed",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "BILI",
+    "cik": 1723690,
+    "nameZh": "哔哩哔哩",
+    "nameEn": "Bilibili Inc.",
+    "color": "#fb7299",
+    "frequency": "mixed",
+    "notes": "勾稽核对：分季度营业利润=毛利-研发-销售管理实测一致（残差≈0），本条为历史标记；详见 docs/KNOWN_CAVEATS.md。",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "CBRS",
+    "cik": 2021728,
+    "nameZh": "Cerebras",
+    "nameEn": "Cerebras Systems Inc.",
+    "color": "#f97316",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "CHA",
+    "cik": 2013649,
+    "nameZh": "霸王茶姬",
+    "nameEn": "Chagee Holdings Limited",
+    "color": "#9a1f2e",
+    "frequency": "mixed",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "CRWV",
+    "cik": 1769628,
+    "nameZh": "CoreWeave",
+    "nameEn": "CoreWeave, Inc.",
+    "color": "#16c79a",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "CSCO",
+    "cik": 858877,
+    "nameZh": "思科",
+    "nameEn": "Cisco Systems, Inc.",
+    "color": "#049fd9",
+    "reports": [
+      "segment.*details",
+      "revenue.*disaggregat"
+    ],
+    "segmentMap": [
+      [
+        "^networking",
+        "Networking",
+        null
+      ],
+      [
+        "^security",
+        "Security",
+        null
+      ],
+      [
+        "^collaboration",
+        "Collaboration",
+        null
+      ],
+      [
+        "^observability",
+        "Observability",
+        null
+      ],
+      [
+        "^services$|^services revenue",
+        "Services",
+        null
+      ],
+      [
+        "^product$",
+        "Product",
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 7
+  },
+  {
+    "ticker": "DELL",
+    "cik": 1571996,
+    "nameZh": "戴尔科技",
+    "nameEn": "Dell Technologies Inc.",
+    "color": "#007db8",
+    "reports": [
+      "segment.*details"
+    ],
+    "segmentMap": [
+      [
+        "^infrastructure solutions|^infrastructure group|^isg",
+        "ISG",
+        null
+      ],
+      [
+        "^client solutions|^client group|^csg",
+        "CSG",
+        null
+      ],
+      [
+        "^corporate and other",
+        "Corporate and other",
+        null
+      ],
+      [
+        "^other businesses",
+        "Corporate and other",
+        null
+      ],
+      [
+        "^total reportable",
+        null,
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 1
+  },
+  {
+    "ticker": "DIDIY",
+    "cik": 1764757,
+    "nameZh": "滴滴",
+    "nameEn": "DiDi Global Inc.",
+    "color": "#ff7a45",
+    "frequency": "mixed",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "DUOL",
+    "cik": 1562088,
+    "nameZh": "多邻国",
+    "nameEn": "Duolingo, Inc.",
+    "color": "#58cc02",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "GOOGL",
+    "cik": 1652044,
+    "nameZh": "谷歌",
+    "nameEn": "Alphabet Inc.",
+    "color": "#7c3aed",
+    "reports": [
+      "disaggregated revenues",
+      "revenues.*details",
+      "segment"
+    ],
+    "segmentMap": [
+      [
+        "google search & other",
+        "Google Search & other",
+        null
+      ],
+      [
+        "youtube ads",
+        "YouTube ads",
+        null
+      ],
+      [
+        "google network",
+        "Google Network",
+        null
+      ],
+      [
+        "google subscriptions, platforms, and devices|google other",
+        "Google subscriptions, platforms, and devices",
+        null
+      ],
+      [
+        "google services total|^google services$",
+        null,
+        null
+      ],
+      [
+        "^google cloud$",
+        "Google Cloud",
+        null
+      ],
+      [
+        "^other bets$",
+        "Other Bets",
+        null
+      ],
+      [
+        "hedging",
+        null,
+        null
+      ],
+      [
+        "^total revenues",
+        null,
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "HPQ",
+    "cik": 47217,
+    "nameZh": "惠普",
+    "nameEn": "HP Inc.",
+    "color": "#0096d6",
+    "reports": [
+      "segment.*details",
+      "segment information"
+    ],
+    "segmentMap": [
+      [
+        "^personal systems",
+        "Personal Systems",
+        null
+      ],
+      [
+        "^printing",
+        "Printing",
+        null
+      ],
+      [
+        "^corporate",
+        null,
+        null
+      ],
+      [
+        "^total segment",
+        null,
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 10
+  },
+  {
+    "ticker": "HUAWEI",
+    "nameZh": "华为",
+    "nameEn": "Huawei Technologies Co., Ltd.",
+    "color": "#cf0a2c",
+    "frequency": "annual",
+    "companyType": "private",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "IBM",
+    "cik": 51143,
+    "nameZh": "国际商业机器",
+    "nameEn": "International Business Machines Corporation",
+    "color": "#1f70c1",
+    "reports": [
+      "segment.*details",
+      "revenue.*disaggregat"
+    ],
+    "segmentMap": [
+      [
+        "^software",
+        "Software",
+        null
+      ],
+      [
+        "^consulting",
+        "Consulting",
+        null
+      ],
+      [
+        "^infrastructure",
+        "Infrastructure",
+        null
+      ],
+      [
+        "^financing",
+        "Financing",
+        null
+      ],
+      [
+        "^total segment",
+        null,
+        null
+      ],
+      [
+        "^other",
+        "Other",
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "INTC",
+    "cik": 50863,
+    "nameZh": "英特尔",
+    "nameEn": "Intel Corporation",
+    "color": "#4d7c0f",
+    "reports": [
+      "segment"
+    ],
+    "segmentMap": [
+      [
+        "client computing group|ccg",
+        "Client Computing Group (CCG)",
+        null
+      ],
+      [
+        "data center and ai|dcai",
+        "Data Center and AI (DCAI)",
+        null
+      ],
+      [
+        "network and edge|nex",
+        "Network and Edge (NEX)",
+        null
+      ],
+      [
+        "^altera",
+        "Altera",
+        null
+      ],
+      [
+        "^mobileye",
+        "Mobileye",
+        null
+      ],
+      [
+        "intel foundry|foundry services",
+        "Intel Foundry",
+        null
+      ],
+      [
+        "^all other|^other",
+        "All Other",
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "JD",
+    "cik": 1549802,
+    "nameZh": "京东",
+    "nameEn": "JD.com, Inc.",
+    "color": "#e1251b",
+    "frequency": "mixed",
+    "notes": "口径差异：分部营收含内部/关联交易未抵销，合计比合并营收高约 5%~6%（2025 为 +6.4%），详见 docs/KNOWN_CAVEATS.md。",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "KO",
+    "cik": 21344,
+    "nameZh": "可口可乐",
+    "nameEn": "The Coca-Cola Company",
+    "color": "#ed1c24",
+    "reports": [
+      "operating segments.*details",
+      "segment.*details"
+    ],
+    "segmentMap": [
+      [
+        "europe|emea|middle east and africa",
+        "EMEA",
+        null
+      ],
+      [
+        "^latin america",
+        "Latin America",
+        null
+      ],
+      [
+        "^north america",
+        "North America",
+        null
+      ],
+      [
+        "^asia pacific",
+        "Asia Pacific",
+        null
+      ],
+      [
+        "^global ventures",
+        "Global Ventures",
+        null
+      ],
+      [
+        "^bottling investments",
+        "Bottling Investments",
+        null
+      ],
+      [
+        "^corporate",
+        null,
+        null
+      ],
+      [
+        "^eliminations",
+        null,
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "LEGO",
+    "nameZh": "乐高",
+    "nameEn": "The LEGO Group",
+    "color": "#ffcf00",
+    "frequency": "annual",
+    "companyType": "private",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "LI",
+    "cik": 1791706,
+    "nameZh": "理想汽车",
+    "nameEn": "Li Auto Inc.",
+    "color": "#00c271",
+    "frequency": "mixed",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "LKNCY",
+    "cik": 1767582,
+    "nameZh": "瑞幸咖啡",
+    "nameEn": "Luckin Coffee Inc.",
+    "color": "#00339a",
+    "frequency": "mixed",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "MC.PA",
+    "nameZh": "LVMH",
+    "nameEn": "LVMH",
+    "color": "#1a1a1a",
+    "notes": "口径差异：分部数据以本位币EUR存储、前端按USD折算，图中分部合计比营收低约10.8%（纯币种口径）；详见 docs/KNOWN_CAVEATS.md。",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "MCD",
+    "cik": 63908,
+    "nameZh": "麦当劳",
+    "nameEn": "McDonald's Corporation",
+    "color": "#da291c",
+    "reports": [
+      "segment.*details",
+      "segment information"
+    ],
+    "segmentMap": [
+      [
+        "^u\\.?s\\.?",
+        "U.S. Market",
+        null
+      ],
+      [
+        "^international operated markets",
+        "International Operated Markets",
+        null
+      ],
+      [
+        "^international developmental licensed",
+        "International Developmental Licensed Markets and Corporate",
+        null
+      ],
+      [
+        "^corporate",
+        null,
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "META",
+    "cik": 1326801,
+    "nameZh": "Meta",
+    "nameEn": "Meta Platforms, Inc.",
+    "color": "#be185d",
+    "reports": [
+      "segment"
+    ],
+    "segmentMap": [
+      [
+        "family of apps|foa",
+        "Family of Apps",
+        null
+      ],
+      [
+        "reality labs|rl",
+        "Reality Labs",
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "MSFT",
+    "cik": 789019,
+    "nameZh": "微软",
+    "nameEn": "Microsoft Corporation",
+    "color": "#0f766e",
+    "reports": [
+      "segment.*(revenue|details)",
+      "segment"
+    ],
+    "segmentMap": [
+      [
+        "intelligent cloud",
+        "Intelligent Cloud",
+        null
+      ],
+      [
+        "productivity and business processes",
+        "Productivity and Business Processes",
+        null
+      ],
+      [
+        "more personal computing",
+        "More Personal Computing",
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 6
+  },
+  {
+    "ticker": "MSI",
+    "cik": 68505,
+    "nameZh": "摩托罗拉解决方案",
+    "nameEn": "Motorola Solutions, Inc.",
+    "color": "#0b5fff",
+    "reports": [
+      "segment.*details",
+      "segment information"
+    ],
+    "segmentMap": [
+      [
+        "^products and systems integration",
+        "Products and Systems Integration",
+        null
+      ],
+      [
+        "^software and services",
+        "Software and Services",
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "MU",
+    "cik": 723125,
+    "nameZh": "美光科技",
+    "nameEn": "Micron Technology, Inc.",
+    "color": "#0f7dc2",
+    "reports": [
+      "revenue.*by market",
+      "segment.*details"
+    ],
+    "segmentMap": [
+      [
+        "^cmbu",
+        "CMBU",
+        null
+      ],
+      [
+        "^cdbu",
+        "CDBU",
+        null
+      ],
+      [
+        "^mcbu",
+        "MCBU",
+        null
+      ],
+      [
+        "^aebu",
+        "AEBU",
+        null
+      ],
+      [
+        "^all other",
+        "All other",
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 9
+  },
+  {
+    "ticker": "NESN.SW",
+    "nameZh": "雀巢",
+    "nameEn": "Nestlé",
+    "color": "#6a4fa3",
+    "notes": "口径差异：分部数据以本位币CHF存储、前端按USD折算，图中分部合计比营收低约17.9%（纯币种口径，非分部缺项）；详见 docs/KNOWN_CAVEATS.md。",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "NFLX",
+    "cik": 1065280,
+    "nameZh": "奈飞",
+    "nameEn": "Netflix, Inc.",
+    "color": "#e50914",
+    "reports": [
+      "streaming.*details",
+      "revenue.*by region",
+      "segment.*details"
+    ],
+    "segmentMap": [
+      [
+        "united states and canada|^ucan",
+        "UCAN",
+        null
+      ],
+      [
+        "^europe",
+        "EMEA",
+        null
+      ],
+      [
+        "^latin america",
+        "LATAM",
+        null
+      ],
+      [
+        "^asia-pacific|^asia pacific",
+        "APAC",
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "NTES",
+    "cik": 1110646,
+    "nameZh": "网易",
+    "nameEn": "NetEase, Inc.",
+    "color": "#d43c33",
+    "frequency": "mixed",
+    "notes": "口径差异：年度行只披露研发、未单列销售及管理费用(sga)，营业利润无法按毛利-研发-销售管理逐项勾稽；详见 docs/KNOWN_CAVEATS.md。",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "NVDA",
+    "cik": 1045810,
+    "nameZh": "英伟达",
+    "nameEn": "NVIDIA Corporation",
+    "color": "#1d55a5",
+    "reports": [
+      "market platform",
+      "segment"
+    ],
+    "segmentMap": [
+      [
+        "^data center$",
+        "Data Center",
+        null
+      ],
+      [
+        "^hyperscale",
+        "Hyperscale",
+        "Data Center"
+      ],
+      [
+        "^ai clouds",
+        "AI Clouds, Industrial & Enterprise",
+        "Data Center"
+      ],
+      [
+        "^edge computing",
+        "Edge Computing",
+        null
+      ],
+      [
+        "^gaming",
+        "Gaming",
+        null
+      ],
+      [
+        "^professional visualization",
+        "Professional Visualization",
+        null
+      ],
+      [
+        "^automotive",
+        "Automotive",
+        null
+      ],
+      [
+        "^oem",
+        "OEM & Other",
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 1
+  },
+  {
+    "ticker": "NXPI",
+    "cik": 1413447,
+    "nameZh": "恩智浦",
+    "nameEn": "NXP Semiconductors N.V.",
+    "color": "#d71920",
+    "reports": [
+      "revenue.*disaggregat",
+      "segment.*details"
+    ],
+    "segmentMap": [
+      [
+        "^automotive",
+        "Automotive",
+        null
+      ],
+      [
+        "^industrial",
+        "Industrial & IoT",
+        null
+      ],
+      [
+        "^mobile",
+        "Mobile",
+        null
+      ],
+      [
+        "^communication infrastructure",
+        "Comm Infra & Other",
+        null
+      ],
+      [
+        "^other",
+        null,
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "ORCL",
+    "cik": 1341439,
+    "nameZh": "甲骨文",
+    "nameEn": "Oracle Corporation",
+    "color": "#a16207",
+    "reports": [
+      "segment information \\(details\\)"
+    ],
+    "segmentMap": [
+      [
+        "cloud and software|cloud and license",
+        "Cloud and Software",
+        null
+      ],
+      [
+        "\\bhardware\\b",
+        "Hardware",
+        null
+      ],
+      [
+        "\\bservices\\b",
+        "Services",
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 5
+  },
+  {
+    "ticker": "PDD",
+    "cik": 1737806,
+    "nameZh": "拼多多",
+    "nameEn": "PDD Holdings Inc.",
+    "color": "#e02e24",
+    "frequency": "mixed",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "PLTR",
+    "cik": 1321655,
+    "nameZh": "帕兰提尔",
+    "nameEn": "Palantir Technologies Inc.",
+    "color": "#1f1f1f",
+    "reports": [
+      "segment.*detail",
+      "revenue.*disaggregat"
+    ],
+    "segmentMap": [
+      [
+        "^government",
+        "Government",
+        null
+      ],
+      [
+        "^commercial",
+        "Commercial",
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "QCOM",
+    "cik": 804328,
+    "nameZh": "高通",
+    "nameEn": "QUALCOMM Incorporated",
+    "color": "#3253dc",
+    "reports": [
+      "segment.*details",
+      "revenue.*disaggregat"
+    ],
+    "segmentMap": [
+      [
+        "^qct",
+        "QCT",
+        null
+      ],
+      [
+        "^qtl",
+        "QTL",
+        null
+      ],
+      [
+        "^qsi",
+        "QSI",
+        null
+      ],
+      [
+        "^reconciling",
+        null,
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 9
+  },
+  {
+    "ticker": "SBUX",
+    "cik": 829224,
+    "nameZh": "星巴克",
+    "nameEn": "Starbucks Corporation",
+    "color": "#006241",
+    "reports": [
+      "segment.*details",
+      "segment information"
+    ],
+    "segmentMap": [
+      [
+        "^beverage",
+        "Beverage",
+        null
+      ],
+      [
+        "^food",
+        "Food",
+        null
+      ],
+      [
+        "^other(?!\\s+countries)",
+        "Other",
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 9
+  },
+  {
+    "ticker": "SONY",
+    "cik": 313838,
+    "nameZh": "索尼",
+    "nameEn": "Sony Group Corporation",
+    "color": "#171717",
+    "frequency": "mixed",
+    "fiscalYearEndMonth": 3
+  },
+  {
+    "ticker": "SPCX",
+    "cik": 1181412,
+    "nameZh": "SpaceX",
+    "nameEn": "Space Exploration Technologies Corp.",
+    "color": "#7a7a7a",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "SPOT",
+    "cik": 1639920,
+    "nameZh": "声田",
+    "nameEn": "Spotify Technology S.A.",
+    "color": "#1db954",
+    "frequency": "mixed",
+    "reports": [
+      "segment.*details",
+      "segment information"
+    ],
+    "segmentMap": [
+      [
+        "^premium",
+        "Premium",
+        null
+      ],
+      [
+        "^ad-supported",
+        "Ad-Supported",
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "STM",
+    "cik": 932787,
+    "nameZh": "意法半导体",
+    "nameEn": "STMicroelectronics N.V.",
+    "color": "#03234b",
+    "frequency": "mixed",
+    "notes": "口径差异：营业利润含研发/销售管理之外的其他经营费用（重组、减值等），毛利-研发-销售管理会高估营业利润（中位偏差约2.6%）；详见 docs/KNOWN_CAVEATS.md。",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "TCOM",
+    "cik": 1269238,
+    "nameZh": "携程",
+    "nameEn": "Trip.com Group Limited",
+    "color": "#1c66e5",
+    "frequency": "mixed",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "TME",
+    "cik": 1744676,
+    "nameZh": "腾讯音乐",
+    "nameEn": "Tencent Music Entertainment Group",
+    "color": "#31c27c",
+    "frequency": "mixed",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "TSLA",
+    "cik": 1318605,
+    "nameZh": "特斯拉",
+    "nameEn": "Tesla, Inc.",
+    "color": "#15803d",
+    "reports": [
+      "total revenues and gross profit by reportable segment",
+      "segment",
+      "revenue recognition"
+    ],
+    "segmentMap": [
+      [
+        "^automotive segment$",
+        "Automotive",
+        null
+      ],
+      [
+        "^automotive sales",
+        "Automotive",
+        null
+      ],
+      [
+        "automotive regulatory credits",
+        "Automotive",
+        null
+      ],
+      [
+        "^automotive leasing",
+        "Automotive",
+        null
+      ],
+      [
+        "^total automotive",
+        null,
+        null
+      ],
+      [
+        "^energy generation and storage segment$",
+        "Energy generation and storage",
+        null
+      ],
+      [
+        "energy generation and storage",
+        "Energy generation and storage",
+        null
+      ],
+      [
+        "^services and other segment$",
+        "Services and other",
+        null
+      ],
+      [
+        "^services and other",
+        "Services and other",
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "TSM",
+    "cik": 1046179,
+    "nameZh": "台积电",
+    "nameEn": "Taiwan Semiconductor Manufacturing Company Limited",
+    "color": "#c8102e",
+    "frequency": "mixed",
+    "reports": [
+      "segment.*details",
+      "supplemental.*revenue"
+    ],
+    "segmentMap": [
+      [
+        "^smartphone",
+        "Smartphone",
+        null
+      ],
+      [
+        "^high performance computing|^hpc",
+        "HPC",
+        null
+      ],
+      [
+        "^internet of things|^iot",
+        "IoT",
+        null
+      ],
+      [
+        "^automotive",
+        "Automotive",
+        null
+      ],
+      [
+        "^digital consumer electronics",
+        "Digital Consumer Electronics",
+        null
+      ],
+      [
+        "^others$",
+        "Others",
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "U",
+    "cik": 1810806,
+    "nameZh": "Unity",
+    "nameEn": "Unity Software Inc.",
+    "color": "#4c4c4c",
+    "reports": [
+      "segment.*details",
+      "revenue.*disaggregat"
+    ],
+    "segmentMap": [
+      [
+        "^create",
+        "Create",
+        null
+      ],
+      [
+        "^grow",
+        "Grow",
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "V",
+    "cik": 1403161,
+    "nameZh": "维萨",
+    "nameEn": "Visa Inc.",
+    "color": "#1a1f71",
+    "reports": [
+      "revenues.*details",
+      "revenue.*disaggregat",
+      "payment network.*details"
+    ],
+    "segmentMap": [
+      [
+        "^service revenue",
+        "Service revenue",
+        null
+      ],
+      [
+        "^data processing",
+        "Data processing revenue",
+        null
+      ],
+      [
+        "^international transaction",
+        "International transaction revenue",
+        null
+      ],
+      [
+        "^value added",
+        "Value added and other",
+        null
+      ],
+      [
+        "^client incentives",
+        "Client incentives",
+        null
+      ],
+      [
+        "^other revenue",
+        "Other revenue",
+        null
+      ]
+    ],
+    "fiscalYearEndMonth": 9
+  },
+  {
+    "ticker": "WB",
+    "cik": 1595761,
+    "nameZh": "微博",
+    "nameEn": "Weibo Corporation",
+    "color": "#e6162d",
+    "frequency": "mixed",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "XNET",
+    "cik": 1510593,
+    "nameZh": "迅雷",
+    "nameEn": "Xunlei Limited",
+    "color": "#3f8cff",
+    "frequency": "mixed",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "ZH",
+    "cik": 1835724,
+    "nameZh": "知乎",
+    "nameEn": "Zhihu Inc.",
+    "color": "#0084ff",
+    "frequency": "mixed",
+    "fiscalYearEndMonth": 12
+  },
+  {
+    "ticker": "603866.SH",
+    "nameZh": "桃李面包",
+    "nameEn": "Toly Bread",
+    "color": "#8d6e63",
+    "fiscalYearEndMonth": 12
+  }
+]
