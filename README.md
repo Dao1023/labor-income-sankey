@@ -8,12 +8,12 @@
 
 ## 怎么看
 
-左侧选案例，中间是桑基图：
+左侧选案例，中间是桑基图，左进右出：
 
-- **个人视角**：收入构成 → 税前应发 → 个人扣缴 → 去向（到手 / 公积金账户 / 年金账户 / 社保统筹 / 医保统筹 / 国库 / 平台中介）
-- **单位成本视角**：额外加一条干流（单位附加成本 → 单位缴纳 → 单位五险一金分项 → 对应统筹池），左右总额都等于用工总成本
+- **个人视角**：收入构成 → 税前应发 → 个人扣缴 → 去向（到手 / 公积金账户 / 养老个人账户 / 年金账户 / 个税·国库 / 医保统筹 / 失业统筹）
+- **单位成本视角**：并行一条「单位附加成本 → 单位缴纳 → 各统筹池」，两条干流共享右侧去向，最左与最右的总额都等于用工总成本
 
-拖动薪资滑杆实时重算；可切换城市（沪 / 京 / 深 / 穗 / 杭 / 蓉）、专项附加扣除、公积金比例、年终奖计税方式。
+顶栏：城市（沪 / 京 / 深 / 穗 / 杭 / 蓉）、**占比**（在名称与金额之间叠加一行百分比）、个人视角 / 单位成本、导出 PNG / SVG。底部滑杆拖动即实时重算。
 
 ## 30 个案例
 
@@ -48,10 +48,23 @@
 start docs/index.html
 
 # 或改源码后重新打包（需 Node 18+）
-node tools/build.mjs        # app/*.js -> dist/labor-income.html
+node tools/build.mjs        # ui/*.js + echarts -> dist/labor-income.html 与 docs/index.html
 node tools/check.mjs        # 720 组收支闭合校验
 ```
 
-源码在 `app/`：`data.js`（案例与城市参数）、`engine.js`（税/社保计算）、`sankey.js`（原生 SVG 桑基渲染）、`app.js`（UI 粘合）。
+界面在 `ui/`：`index.html`（结构与样式，视觉沿用 profitbridge）、`app.js`（ECharts 桑基渲染、标签避让、导出）、`labor.js`（把计算结果桥接成 nodes/links）、`vendor/echarts.min.js`。数据与算法在 `app/data.js`（案例与城市参数）、`app/engine.js`（税 / 社保计算）。
+
+## 上游同步
+
+界面层 fork 自 [profitbridge](https://github.com/Dao1023/profitbridge)，用 git subtree 维护（**在本机执行**；沙箱内 git 无法 fork 子进程，fetch/push/subtree 都会报 `Permission denied`）：
+
+```bash
+git remote add profitbridge https://github.com/Dao1023/profitbridge.git
+git fetch profitbridge
+git subtree add  --prefix=ui profitbridge main --squash   # 首次并入
+git subtree pull --prefix=ui profitbridge main --squash   # 以后跟进上游
+```
+
+冲突处理原则：自己的改动集中在 `ui/index.html`、`ui/app.js`、`ui/labor.js`；上游的 `ui/vendor/echarts.min.js` 与 CSS 变量、`.logo` / `.exportGroup` 等类名可直接接受。
 
 研究底稿在 `research/`：个税规则、社保基数与费率、40 种用工形态、数据口径审查表。

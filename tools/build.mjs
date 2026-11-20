@@ -1,26 +1,36 @@
-/* 把 app/ 的四个脚本内联进 index.html，产出单文件 dist/labor-income.html */
+/* 把 ui/index.html 引用的脚本（含 vendor/echarts.min.js）内联成单文件
+   产出：dist/labor-income.html 与 docs/index.html（GitHub Pages） */
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = path.resolve(new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
-const appDir = path.join(root, 'app');
-const distDir = path.join(root, 'dist');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const uiDir = path.join(root, 'ui');
 
-let html = fs.readFileSync(path.join(appDir, 'index.html'), 'utf8');
-const files = ['data.js', 'engine.js', 'sankey.js', 'app.js'];
+let html = fs.readFileSync(path.join(uiDir, 'index.html'), 'utf8');
 let inlined = 0;
 
-for (const f of files) {
-  const tag = `<script src="${f}"></script>`;
-  if (!html.includes(tag)) throw new Error(`未找到脚本标签: ${tag}`);
-  const code = fs.readFileSync(path.join(appDir, f), 'utf8');
-  if (code.includes('</script')) throw new Error(`${f} 含有 </script，无法安全内联`);
-  html = html.replace(tag, () => `<script>\n${code}\n</script>`);
+html = html.replace(/<script\s+src="([^"]+)"\s*><\/script>/g, (tag, src) => {
+  const file = path.resolve(uiDir, src);
+  if (!fs.existsSync(file)) throw new Error(`脚本不存在: ${src}`);
+  const code = fs.readFileSync(file, 'utf8');
+  if (code.includes('</script')) throw new Error(`${src} 含有 </script 字面量，无法安全内联`);
   inlined++;
-}
+  return `<script>\n${code}\n</script>`;
+});
 
 if (/<script[^>]+src=/.test(html)) throw new Error('仍有外部脚本引用');
-fs.mkdirSync(distDir, { recursive: true });
-const out = path.join(distDir, 'labor-income.html');
-fs.writeFileSync(out, html);
-console.log(`inlined ${inlined} scripts -> ${path.relative(root, out)} (${(Buffer.byteLength(html) / 1024).toFixed(1)} KB)`);
+if (/<link[^>]+href=/.test(html)) throw new Error('仍有外部样式引用');
+
+fs.mkdirSync(path.join(root, 'dist'), { recursive: true });
+fs.mkdirSync(path.join(root, 'docs'), { recursive: true });
+const out1 = path.join(root, 'dist', 'labor-income.html');
+const out2 = path.join(root, 'docs', 'index.html');
+fs.writeFileSync(out1, html);
+fs.writeFileSync(out2, html);
+fs.writeFileSync(path.join(root, 'docs', '.nojekyll'), '');
+
+const kb = (Buffer.byteLength(html) / 1024).toFixed(0);
+console.log(`inlined ${inlined} scripts`);
+console.log(`  dist/labor-income.html  ${kb} KB`);
+console.log(`  docs/index.html         ${kb} KB (Pages)`);
