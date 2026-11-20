@@ -202,6 +202,7 @@
   function currentCase() { return caseById(S.caseId); }
 
   function recompute() {
+    if (tipEl) tipFn.hide();
     var c = currentCase();
     var r = E.compute(c, {
       gross: S.gross, city: S.city, deductions: S.deductions,
@@ -247,6 +248,12 @@
     }).join('');
   }
 
+  function grossLabel(c) {
+    var t = (c.tax && c.tax.type) || 'wage';
+    return t === 'service' ? '劳务收入（月）' : t === 'business' ? '经营流水（月）'
+      : t === 'none' ? '现金收入（月）' : '税前应发（月）';
+  }
+
   function renderTable(r, c) {
     var rows = [];
     function row(label, val, cls, indent) {
@@ -258,7 +265,7 @@
       var extraOnly = r.er.extra - r.er.agencyDeduct;
       if (extraOnly > 0.5) row('经营成本', -extraOnly, 'sub', 1);
     }
-    row('税前应发（月）', r.gross, 'strong');
+    row(grossLabel(c), r.gross, 'strong');
     if (r.p.pension) row('养老（个人）', -r.p.pension, 'sub', 1);
     if (r.p.medical) row('医疗（个人）', -r.p.medical, 'sub', 1);
     if (r.p.unemp) row('失业（个人）', -r.p.unemp, 'sub', 1);

@@ -60,7 +60,7 @@
     state.ky = ky;
 
     cols.forEach(function (arr, L) {
-      arr.forEach(function (n) { n.x = P.L + L * step; n.h = n.value * ky; });
+      arr.forEach(function (n) { n.x = P.L + L * step; n.h = Math.max(2.5, n.value * ky); });
       var colH = arr.reduce(function (a, n) { return a + n.h; }, 0) + GAP * (arr.length - 1);
       var y = P.T + Math.max(0, (plotH - colH) / 2);
       arr.forEach(function (n) {
@@ -109,11 +109,12 @@
     arr.sort(function (a, b) { return a.desired - b.desired; });
     var MIN = 8, MAX = state.H - 6 - h;
     var prev = -Infinity;
-    arr.forEach(function (it) { it.top = Math.max(it.desired, MIN, prev + gap + h); prev = it.top; });
-    var over = arr[arr.length - 1].top - MAX;
+    arr.forEach(function (it) { var hh = it.h || h; it.top = Math.max(it.desired, MIN, prev + gap + hh); prev = it.top; });
+    var lastH = arr[arr.length - 1].h || h;
+    var over = arr[arr.length - 1].top - (state.H - 6 - lastH);
     if (over > 0) arr.forEach(function (it) { it.top -= over; });
     prev = -Infinity;
-    arr.forEach(function (it) { it.top = Math.max(it.top, MIN, prev + gap + h); prev = it.top; });
+    arr.forEach(function (it) { var hh = it.h || h; it.top = Math.max(it.top, MIN, prev + gap + hh); prev = it.top; });
   }
 
   var STYLE = [
@@ -192,8 +193,10 @@
 
     // 节点
     state.nodes.forEach(function (n) {
+      var hitH = Math.max(10, n.h);
+      var hit = el('rect', { x: r2(n.x - 3), y: r2(n.cy - hitH / 2), width: NODE_W + 6, height: r2(hitH), fill: 'transparent', 'pointer-events': 'all' });
       var rect = el('rect', { x: r2(n.x), y: r2(n.y), width: NODE_W, height: Math.max(2.5, r2(n.h)), rx: 2.5, fill: n.color });
-      var g = el('g', { class: 'nd', 'data-kind': 'node', 'data-id': n.id }, [rect]);
+      var g = el('g', { class: 'nd', 'data-kind': 'node', 'data-id': n.id }, [hit, rect]);
       if (n.hero) g.appendChild(el('rect', { x: r2(n.x - 4), y: r2(n.y - 4), width: NODE_W + 8, height: Math.max(2.5, r2(n.h)) + 8,
         rx: 5, fill: 'none', stroke: '#16a34a', 'stroke-width': 1.2, 'stroke-opacity': .38 }));
       gNodes.appendChild(g);
@@ -209,22 +212,41 @@
       colCount[n.layer] = (colCount[n.layer] || 0) + 1;
     });
 
+    var tiny = [];
     var labels = state.nodes.filter(function (n) {
-      if (n.hideLabel || n.h < 5) return false;                       // 太薄的节点只留 tooltip
-      if (colSum[n.layer] > 0 && n.value / colSum[n.layer] < 0.006) return false;
+      var thin = n.hideLabel || n.h < 5 || (colSum[n.layer] > 0 && n.value / colSum[n.layer] < 0.006);
+      if (thin) { tiny.push(n); return false; }
       return true;
     }).map(function (n) {
-      var side = n.layer === 0 ? 'left'
-        : (n.layer === maxLayer ? 'right'
-          : (colCount[n.layer] === 1 ? 'top' : (String(n.id).charAt(0) === 'e' ? 'midL' : 'midR')));
+      /* 两条干流的同名列统一居中放在节点上方，避免左右锚点造成「错列」错觉 */
+      var side = (n.id === 'gross' || n.id === 'er1') ? 'top'
+        : n.layer === 0 ? 'left'
+          : (n.layer === maxLayer ? 'right'
+            : (colCount[n.layer] === 1 ? 'top' : (String(n.id).charAt(0) === 'e' ? 'midL' : 'midR')));
       return { n: n, side: side, desired: (side === 'top' ? n.y - LABEL_H - 8 : n.cy - LABEL_H / 2), top: 0 };
+    });
+
+    /* 每列挑一个「原本会被隐藏」的小额项做 callout，避免只剩漂浮色块 */
+    var callouts = new Map();
+    tiny.forEach(function (n) {
+      if (!(n.value > 0)) return;
+      var cur = callouts.get(n.layer);
+      if (!cur || n.value > cur.value) callouts.set(n.layer, n);
+    });
+    callouts.forEach(function (n) {
+      var side = n.layer === 0 ? 'left' : (n.layer === maxLayer ? 'right' : (String(n.id).charAt(0) === 'e' ? 'midL' : 'midR'));
+      labels.push({ n: n, side: side, small: true, compact: true, h: 24, desired: n.cy - 12, top: 0 });
     });
     var groups = new Map();
     labels.forEach(function (L) { if (!groups.has(L.side)) groups.set(L.side, []); groups.get(L.side).push(L); });
     var avail = state.H - 16;
     groups.forEach(function (arr) {
-      var compact = arr.length * (LABEL_GAP + LABEL_H) > avail;
-      arr.forEach(function (it) { it.compact = compact; it.h = compact ? 18 : LABEL_H; });
+      var needSum = arr.reduce(function (a, it) { return a + (it.h || LABEL_H) + LABEL_GAP; }, 0);
+      var compact = needSum > avail;
+      arr.forEach(function (it) {
+        if (it.small) return;                       // callout 本身就是小号
+        it.compact = compact; it.h = compact ? 18 : LABEL_H;
+      });
       placeLabels(arr, compact ? 18 : LABEL_H, compact ? 4 : LABEL_GAP);
     });
 
@@ -240,9 +262,9 @@
         kids.push(el('path', { class: 'lead', d: 'M' + r2(n.x) + ',' + r2(n.cy) + ' L' + r2(n.x - 9) + ',' + r2(mid) }));
       } else if (L.side === 'right' && Math.abs(mid - n.cy) > 8) {
         kids.push(el('path', { class: 'lead', d: 'M' + r2(n.x + NODE_W) + ',' + r2(n.cy) + ' L' + r2(n.x + NODE_W + 9) + ',' + r2(mid) }));
-      } else if (L.side === 'midL' && Math.abs(mid - n.cy) > 8) {
+      } else if (L.side === 'midL' && (L.small || Math.abs(mid - n.cy) > 8)) {
         kids.push(el('path', { class: 'lead', d: 'M' + r2(n.x - 2) + ',' + r2(n.cy) + ' L' + r2(x + 5) + ',' + r2(mid) }));
-      } else if (L.side === 'midR' && Math.abs(mid - n.cy) > 8) {
+      } else if (L.side === 'midR' && (L.small || Math.abs(mid - n.cy) > 8)) {
         kids.push(el('path', { class: 'lead', d: 'M' + r2(n.x + NODE_W + 2) + ',' + r2(n.cy) + ' L' + r2(x - 5) + ',' + r2(mid) }));
       } else if (L.side === 'top' && n.y - (L.top + L.h) > 8) {
         kids.push(el('path', { class: 'lead', d: 'M' + r2(n.cx) + ',' + r2(n.y) + ' L' + r2(n.cx) + ',' + r2(L.top + L.h) }));
