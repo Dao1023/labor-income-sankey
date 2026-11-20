@@ -1,0 +1,2319 @@
+/* Profit Bridge dashboard — data-driven, all figures from data/profit.json (SEC EDGAR XBRL)
+   and data/segments.json (SEC EDGAR XBRL segment R files).
+   Sankey rendered with the ECharts (v5.5.1) sankey series, SVG renderer.
+   Input side: segment inflows (blue) → Revenue (gray, center).
+   Output side: profit waterfall (green) + cost branches (red) + non-operating inflow. */
+'use strict';
+
+const I18N = {
+  en: {
+    appTitle: 'Financial Reports', langBtn: '中文',
+    reset: '', exportPNG: 'Export PNG', exportSVG: 'Export SVG',
+    nodes: {
+      revenue: 'Revenue', cogs: 'Cost of revenue', gross: 'Gross profit', opex: 'Operating expenses',
+      rd: 'R&D expenses', sga: 'Selling, general & admin',
+      op: 'Operating income', taxOther: 'Tax & other', net: 'Net income', nonop: 'Non-operating income',
+      loss: 'Operating loss', netLoss: 'Net loss', grossNeg: 'Negative gross profit',
+      undisclosedCost: 'Undisclosed costs & taxes (gross / op income not disclosed)',
+      undisclosedCostShort: 'Undisclosed costs & taxes',
+    },
+    degradedNotice: 'Gross profit & operating income not disclosed — showing revenue → net income only',
+    source: 'Data source:', updated: 'Data updated:', asof: 'As of',
+    coverage: 'Segment inflow (input side) available:', coverageNone: 'Segment data unavailable for this company — showing the profit waterfall only.',
+    quartersWith: 'quarters with segments', ofQ: 'of', segSource: 'segments:',
+    segUnavailableTitle: 'No public segment disclosure',
+    segNoDataTitle: 'Segment data unavailable',
+    segNoDataHint: 'The data source provides no segment breakdown for this company, so only the profit waterfall is shown.',
+    segQuarterTitle: 'No segment disclosure this quarter',
+    segQuarterHint: 'Segments are disclosed only in annual / interim reports, not quarterly filings. Open an annual or interim quarter to see segment inflows.',
+    pctBtn: '% of revenue', qoqBtn: 'QoQ',
+    pctNote: 'Shares are relative to this quarter\'s revenue; expense lines shown as % of revenue.',
+    qoqNote: 'QoQ: flows/amounts = % change vs prior quarter; margins = percentage points (pp). “—” = no prior-quarter data.',
+    qoqNA: 'n/a (cumulative period)',
+    margins: { gross: 'Gross margin', op: 'Operating margin', net: 'Net margin' },
+    ofRev: '% of rev', qoqSuffix: 'QoQ',
+    viewBridge: 'Sankey', viewBar: 'Bar chart',
+    barGroups: { items: 'Income statement', segments: 'Segments', margins: 'Margins' },
+    barNoData: 'No disclosed data for this item', barFullHistory: 'full history', barFullHistoryAnnual: 'full history (annual)', barFullHistorySemiannual: 'full history (semiannual)',
+    barNoDataTag: 'no data',
+    segNotes: 'Segment notes',
+  },
+  zh: {
+    appTitle: '财报可视化', langBtn: 'English',
+    reset: '', exportPNG: '导出 PNG', exportSVG: '导出 SVG',
+    nodes: {
+      revenue: '营收', cogs: '营收成本', gross: '毛利润', opex: '营业费用',
+      rd: '研发费用', sga: '销售与管理费用',
+      op: '营业利润', taxOther: '税费及其他', net: '净利润', nonop: '非经营性收益',
+      loss: '营业亏损', netLoss: '净亏损', grossNeg: '负毛利',
+      undisclosedCost: '未披露的成本费用及税项（毛利/营业利润缺失）',
+      undisclosedCostShort: '未披露成本及税项',
+    },
+    degradedNotice: '毛利与营业利润未披露，仅显示营收 → 净利润',
+    source: '数据来源：', updated: '数据更新：', asof: '截至',
+    coverage: '分部流入（input 侧）可用：', coverageNone: '该公司暂无可用分部数据 —— 仅绘制利润瀑布。',
+    quartersWith: '个季度有分部数据', ofQ: '/', segSource: '分部数据：',
+    segUnavailableTitle: '该公司未公开分部数据',
+    segNoDataTitle: '暂无可用分部数据',
+    segNoDataHint: '数据源未提供该公司的分部拆分，当前仅展示利润瀑布。',
+    segQuarterTitle: '当前季度无分部披露',
+    segQuarterHint: '该公司仅在年报/半年报披露分部，季报不披露；可在年报/半年报季度查看分部流入。',
+    pctBtn: '占比', qoqBtn: '环比',
+    pctNote: '占比口径：均相对本季营收；费用项显示占营收比。',
+    qoqNote: '环比口径：金额/流量为环比 % 变化；利润率为百分点（pp）。“—”表示上季无数据。',
+    qoqNA: '累计期不可比',
+    margins: { gross: '毛利率', op: '营业利润率', net: '净利率' },
+    ofRev: '占营收', qoqSuffix: 'QoQ',
+    viewBridge: '桑基图', viewBar: '柱状图',
+    barGroups: { items: '利润科目', segments: '分部', margins: '利润率' },
+    barNoData: '该子项无披露数据', barFullHistory: '全历史季度', barFullHistoryAnnual: '全历史年度', barFullHistorySemiannual: '全历史半年度',
+    barNoDataTag: '无数据',
+    segNotes: '口径备注',
+  },
+};
+
+/* zh display names for chart title — from data/companies.json registry (built-in fallback) */
+const ZH_NAMES_FALLBACK = {
+  NVDA: '英伟达', AAPL: '苹果', MSFT: '微软', GOOGL: '谷歌', AMZN: '亚马逊',
+  META: 'Meta', TSLA: '特斯拉', ORCL: '甲骨文', AMD: '超威半导体', INTC: '英特尔',
+};
+let REGISTRY = []; // data/companies.json — single source of company truth (see P4 governance)
+const regOf = tk => REGISTRY.find(c => c.ticker === tk) || null;
+/* ---- true fiscal quarter of a period END ----
+   Calendar quarters are wrong for every filer whose fiscal year does not end in December:
+   Cisco's quarter ending 2026-10-24 is FY2027 Q1, not calendar "Q4 2026"; Micron's
+   2026-09-03 is FY2026 Q4; Oracle's 2026-08-31 is FY2027 Q1. fiscalQuarterOf() maps an end
+   date onto the company's own fiscal calendar, where `fyeMonth` (1–12, from
+   data/companies.json) is the month the fiscal year ends in and the fiscal year is named by
+   the year it ENDS in (MSFT's year ending 2027-06-30 is FY2027 — the convention the old
+   fiscalYearOf() already used).
+
+   52/53-week filers drift: the fiscal year closes on the weekday nearest the month end, so
+   it can land up to ~6 days INTO the following month (Dell FY2019 ended 2019-02-01 on a
+   January FYE; Micron FY2026 ended 2026-09-03 on an August FYE). An end date inside the
+   first 7 days of a month is therefore bucketed to the PREVIOUS month before the FY /
+   quarter arithmetic, which restores the nominal month-end boundary — without it,
+   2019-02-01 would read as FY2019 Q1 instead of FY2019 Q4. It also fixes quarter index
+   drift such as Dell's Q3 ending 2024-11-01 (= Aug–Oct, Q3, not Q4).
+   Returns { fy, q, label } with `label` the canonical chart label ("FY2026 Q4");
+   null only for an unparseable date, so callers can degrade instead of throwing. */
+const FQ_DRIFT_DAYS = 7;
+function fiscalQuarterOf(endDate, fyeMonth) {
+  const s = String(endDate || '');
+  const y0 = Number(s.slice(0, 4)), m0 = Number(s.slice(5, 7)), d0 = Number(s.slice(8, 10));
+  if (!y0 || !m0 || !d0) return null;
+  let fye = Number(fyeMonth);
+  if (!(fye >= 1 && fye <= 12)) fye = 12;          // missing/invalid FYE → December (old behaviour)
+  const back = d0 <= FQ_DRIFT_DAYS;
+  const m = back ? (m0 === 1 ? 12 : m0 - 1) : m0;  // nominal month-end boundary
+  const y = (back && m0 === 1) ? y0 - 1 : y0;
+  const fy = m > fye ? y + 1 : y;                  // FY named by the year it ends in
+  const start = (fye % 12) + 1;                    // first month of the fiscal year
+  const mfs = ((m - start) % 12 + 12) % 12;        // months elapsed inside the fiscal year
+  const q = Math.floor(mfs / 3) + 1;
+  return { fy, q, label: `FY${fy} Q${q}` };
+}
+function quarterLabel(end, periodType) {
+  const y = Number(end.slice(0, 4)), m = Number(end.slice(5, 7));
+  if (periodType === 'annual' || isAnnual()) return `FY ${fiscalYearOf(end)}`;
+  if (periodType === 'interim') return `H1 ${fiscalYearOf(end)}`;
+  const fq = fiscalQuarterOf(end, fiscalYearEndMonth(state.company));
+  if (!fq) return `Q${Math.floor((m - 1) / 3) + 1} ${y}`; // unparseable date → legacy label
+  return fq.label;
+}
+/* Fiscal year that a period END belongs to. Calendar-FYE filers: the calendar year.
+   Non-December FYE (e.g. 00151.HK FYE=3): a period ending AFTER the FYE month belongs to
+   the NEXT fiscal year — 00151 2025-09-30 covers Apr–Sep 2025 = FY2026 H1, not FY2025.
+   fiscalYearEndMonth() is defined further down (hoisted) so this is safe to call. */
+function fiscalYearOf(end, tk = state.company) {
+  const fq = fiscalQuarterOf(end, fiscalYearEndMonth(tk));
+  return fq ? fq.fy : Number(end.slice(0, 4));
+}
+function shortName(ticker) {
+  const c = DATA.companies[ticker];
+  const stripped = (c.name || '').replace(/,? (Inc\.|Corporation|Co\.,? Ltd\.|Ltd\.|Platforms, Inc\.|com, Inc\.)$/, '');
+  return lang === 'zh' ? (regOf(ticker)?.nameZh || ZH_NAMES_FALLBACK[ticker] || stripped) : stripped;
+}
+let lang = 'zh'; // 中文界面为默认，右上按钮切换 English
+const t = k => I18N[lang][k];
+const tn = k => I18N[lang].nodes[k] || k;
+
+let DATA = null;      // profit.json (values in $M)
+let SEG = null;       // segments.json (values in $M) — optional, degrade gracefully
+let chart = null;     // echarts instance
+/* ---- industry filter: mapping table lives here (data/ untouched) ----
+   A company may span MULTIPLE industries (e.g. Google = internet + AI):
+   INDUSTRY_OF[tk] is an array; filtering is multi-select union. */
+const INDUSTRY_GROUPS = [
+  { id: 'semi', zh: '半导体', en: 'Semiconductors', tickers: [
+    'NVDA','AMD','INTC','AVGO','MU','QCOM','NXPI','ARM','STM','TSM','ASML',
+    '00981.HK','688981.SS','688825.SS','688256.SS','688795.SS','2454.TW','2330.TW','000660.KS','005930.KS'] },
+  { id: 'ai', zh: 'AI', en: 'AI', tickers: [
+    'NVDA','AMD','GOOGL','MSFT','META','AVGO','BIDU','CRWV','PLTR','TSLA','SPCX',
+    '688256.SS','688795.SS'] },
+  { id: 'soft', zh: '软件/互联网', en: 'Software / Internet', tickers: [
+    'MSFT','GOOGL','AMZN','META','ORCL','PLTR','NFLX','ADBE','IBM','U','DUOL','SPOT','CRWV',
+    'BABA','BIDU','TCOM','JD','PDD','BILI','WB','ZH','XNET','TME','DIDIY',
+    '00700.HK','03690.HK','01024.HK','03888.HK','601360.SS'] },
+  { id: 'hw', zh: '硬件/消费电子', en: 'Hardware / Devices', tickers: [
+    'AAPL','DELL','HPQ','CSCO','MSI','SONY','005930.KS','066570.KS','00992.HK',
+    '002415.SZ','000333.SZ','000100.SZ','HUAWEI'] },
+  { id: 'auto', zh: '汽车/新能源', en: 'Auto / Energy', tickers: ['TSLA','LI','300750.SZ','002594.SZ'] },
+  { id: 'space', zh: '航天', en: 'Aerospace', tickers: ['SPCX'] },
+  { id: 'cons', zh: '消费', en: 'Consumer', tickers: [
+    'KO','MCD','SBUX','LKNCY','02097.HK','00151.HK','600519.SS','600887.SS','603866.SH','NESN.SW','MC.PA',
+    'AAPL','SONY','LEGO'] },
+  { id: 'fin', zh: '金融', en: 'Financials', tickers: ['V','01398.HK','03968.HK'] },
+  { id: 'tele', zh: '通信', en: 'Telecom', tickers: ['00941.HK','00728.HK','00762.HK','000063.SZ','HUAWEI'] },
+];
+const INDUSTRY_OF = {};
+for (const g of INDUSTRY_GROUPS) g.tickers.forEach(tk => { (INDUSTRY_OF[tk] ||= []).push(g.id); });
+const industriesOf = tk => INDUSTRY_OF[tk] || [];
+
+let state = { company: 'NVDA', qIndex: null, mode: { pct: false, qoq: false }, view: 'bridge', barItem: 'revenue', curMode: 'native', industries: [] }; // qIndex null = latest; curMode: CNY companies 'native' ¥ | 'usd'
+/* bar-view overlay lines (占比/环比 buttons control these in bar view; sankey keeps state.mode) */
+const barLines = { pct: true, qoq: true };
+
+const MB = 1e3; // millions → billions display factor (all data is in millions of the reporting currency)
+/* reporting-currency symbol per company (currency field = <ISO>-M; foreign filers like
+   SPOT/ASML EUR, SONY JPY, TME CNY store values as filed) */
+const CUR_SYM = { USD: '$', EUR: '€', JPY: '¥', CNY: '¥', TWD: 'NT$', KRW: '₩', CHF: 'CHF ' };
+const curSym = (tk = state.company) =>
+  CUR_SYM[(DATA.companies[tk].currency || 'USD-M').slice(0, 3)] || (DATA.companies[tk].currency || 'USD-M').slice(0, 3) + ' ';
+const isAnnual = (tk = state.company) => DATA.companies[tk].frequency === 'annual'; // 20-F annual series vs 10-Q quarterly
+/* ---- multi-currency display layer ----
+   Native values live in profit.json in the reporting currency (entry.currency).
+   USD entries show as-is. CNY entries get a ¥/US$ toggle (per-period fxToUsd).
+   Every other non-USD currency (EUR/JPY/TWD/KRW/CHF-M) auto-converts to USD for display. */
+const curOf = (tk = state.company) => (DATA.companies[tk].currency || 'USD-M');
+const isUsd = (tk = state.company) => curOf(tk) === 'USD-M';
+const canToggleCur = (tk = state.company) => curOf(tk) === 'CNY-M';
+const dispInUsd = (tk = state.company) => isUsd(tk) || !canToggleCur(tk) || state.curMode === 'usd';
+/* native value → display-unit scale (unitless); per-period fxToUsd, 1 for USD/native */
+function dispFactor(qv, tk = state.company) {
+  return dispInUsd(tk) && qv && qv.fxToUsd != null ? qv.fxToUsd : 1;
+}
+/* scale for segments.json values (always USD $M): to USD display 1, to native CNY 1/fx */
+function segFactor(qv, tk = state.company) {
+  return dispInUsd(tk) ? 1 : 1 / (qv && qv.fxToUsd != null ? qv.fxToUsd : 1);
+}
+function dispSym(tk = state.company) { return dispInUsd(tk) ? '$' : '¥'; }
+/* QoQ label — '同比/YoY' on annual series, '环比/QoQ' otherwise */
+const qoqSuffix = () => isAnnual() ? (lang === 'zh' ? '同比' : 'YoY') : t('qoqSuffix');
+const fmtPct = v => v == null ? '—' : (v * 100).toFixed(1) + '%';
+const fmtDelta = v => v == null ? '—' : (v >= 0 ? '+' : '') + (v * 100).toFixed(1) + '%';
+const fmtPP = v => v == null ? '—' : (v >= 0 ? '+' : '') + (v * 100).toFixed(1) + 'pp';
+
+/* ---- label-mode helpers (pct / QoQ); only change label display, never node values ---- */
+const MARGIN_KEYS = ['gross', 'op', 'net'];
+const KEY_ALIAS = { netLoss: 'net', loss: 'op', grossNeg: 'gross' }; // loss/grossNeg hold |opInc| / |gross|: their amount QoQ is opInc's / gross's
+
+/* Raw USD metrics for one quarter, mirroring the nodes buildGraph() actually creates
+   (same guards: opex only when the waterfall branch emits it, etc.). */
+function rawMetrics(qv) {
+  if (!qv) return null;
+  const B = MB, f = dispFactor(qv);
+  const m = {
+    revenue: qv.revenue * f, gross: qv.gross != null ? qv.gross * f : null,
+    cogs: qv.gross != null ? (qv.revenue - qv.gross) * f : null,
+    rd: qv.rd != null ? qv.rd * f : null, sga: qv.sga != null ? qv.sga * f : null,
+    op: qv.opInc != null ? qv.opInc * f : null, net: qv.netInc != null ? qv.netInc * f : null,
+  };
+  let opex = null;
+  if (m.gross != null && m.op != null && m.op >= 0 && m.op <= m.gross) {
+    const opexVal = m.gross - m.op;
+    if (m.rd != null && m.sga != null && m.rd / B + m.sga / B <= opexVal / B * 1.001) {
+      const other = opexVal - m.rd - m.sga;
+      opex = other > 0 ? other : null;
+    } else opex = opexVal;
+  } else if (m.gross == null && m.op != null && m.op >= 0) {
+    opex = m.revenue - m.op;
+  }
+  m.opex = opex;
+  m.taxOther = (m.op != null && m.net != null) ? Math.max(m.op - m.net, 0) : null;
+  m.nonop = (m.op != null && m.net != null) ? Math.max(m.net - m.op, 0) : null;
+  return m;
+}
+
+/* amount QoQ (% change vs prior quarter); null when either side lacks data */
+function qoqAmount(name) {
+  const curM = rawMetrics(q()), prevQ = prev(1), prevM = rawMetrics(prevQ);
+  if (!curM || !prevM) return null;
+  const k = KEY_ALIAS[name] || name;
+  const cv = curM[k], pv = prevM[k];
+  return (cv != null && pv != null && pv !== 0) ? (cv - pv) / Math.abs(pv) : null;
+}
+
+/* segment-node amount QoQ; null if the prior quarter has no segment data or the segment is missing */
+function qoqSegment(name) {
+  const nm = name.slice(4), prevQ = prev(1);
+  if (!prevQ) return null;
+  const find = list => {
+    if (!list) return null;
+    const top = list.find(s => s.name === nm);
+    if (top) return top.value;
+    for (const s of list) if (s.children) { const ch = s.children.find(c => c.name === nm); if (ch) return ch.value; }
+    return null;
+  };
+  const cv = find(segmentsFor(state.company, q().end));
+  const pv = find(segmentsFor(state.company, prevQ.end));
+  return (cv != null && pv != null && pv !== 0) ? (cv - pv) / Math.abs(pv) : null;
+}
+
+/* margin (pp) QoQ for gross/op/net — change of ratio vs prior quarter, in percentage points */
+function qoqMarginPP(key) {
+  const mg = m => (m && m.revenue && m[key] != null) ? m[key] / m.revenue : null;
+  const a = mg(rawMetrics(q())), b = mg(rawMetrics(prev(1)));
+  return (a != null && b != null) ? (a - b) : null;
+}
+
+/* QoQ line for a node label: flows/amounts → fmtDelta %, margins (only when pct mode shows them as ratios) → pp */
+function qoqText(name) {
+  // In a cumulative (YTD) segment period the nodes show YTD sums, so a single-quarter
+  // QoQ comparison (this YTD vs last single quarter) is not meaningful — mark it n/a
+  // instead of showing a misleading percentage. `__qvEff` is set by renderChart().
+  if (window.__qvEff) return t('qoqNA');
+  if (state.mode.pct && MARGIN_KEYS.includes(name)) return fmtPP(qoqMarginPP(name));
+  const v = name.startsWith('seg:') ? qoqSegment(name) : qoqAmount(name);
+  return fmtDelta(v); // '—' when no prior data
+}
+
+function q() {
+  const c = DATA.companies[state.company];
+  const i = state.qIndex == null ? c.quarters.length - 1 : state.qIndex;
+  return c.quarters[i];
+}
+function prev(offset) {
+  /* comparable prior period: same period class (annual row vs single quarter),
+     sane day-gap (annual ↔ annual: 300–400d; quarter ↔ quarter: 70–250d).
+     Prevents comparing across the annual/interim boundary in hk-mixed series. */
+  const qs = DATA.companies[state.company].quarters;
+  const curIdx = state.qIndex == null ? qs.length - 1 : state.qIndex;
+  const i = curIdx - (offset || 0);
+  if (i < 0 || i >= qs.length) return null;
+  const cur = qs[curIdx], p = qs[i];
+  const cls = qv => (isAnnual() || qv.periodType === 'annual') ? 'annual' : 'q';
+  if (cls(p) !== cls(cur)) return null;
+  const d = Math.abs((new Date(p.end) - new Date(cur.end)) / 864e5);
+  if (cls(cur) === 'annual') return (d >= 300 && d <= 400) ? p : null;
+  return (d >= 70 && d <= 250) ? p : null;
+}
+/* ---- palette (no gradients anywhere; ribbons are solid per-link colors) ---- */
+const BLUE = '#3b82c4', GRAY = '#4b5563', GREEN = '#16a34a', RED = '#dc2626', GOLD = '#d4a017';
+const NODE_COLORS = { revenue: GRAY, gross: GREEN, cogs: RED, opex: RED, rd: RED, sga: RED,
+  op: GREEN, taxOther: RED, undisclosedCost: RED, net: GREEN, nonop: GOLD, netLoss: RED };
+/* Node id for the residual branch of the DEGRADED waterfall (revenue → net only, no gross/opInc).
+   It is deliberately distinct from 'taxOther': the normal op→net 'taxOther' really is tax & other,
+   while this residual lumps cost-of-revenue + opex + tax + everything undisclosed together. */
+const DEGRADED_RESIDUAL = 'undisclosedCost';
+const FLOW_OPACITY = 0.55;
+
+/* segment inflow availability for a company+quarter (segments are $M).
+   annualQuarters-only filers (e.g. 00992.HK Lenovo) keep their annual segment rows in
+   `annualQuarters` with an EMPTY `quarters` map — fall back to it so their sub-items are
+   visible at all (the sankey already has a dedicated annualQuarters path). */
+function segmentsFor(ticker, qEnd) {
+  const c = SEG && SEG.companies && SEG.companies[ticker];
+  if (!c) return null;
+  return (c.quarters && c.quarters[qEnd]) || (c.annualQuarters && c.annualQuarters[qEnd]) || null;
+}
+
+/* Why does a company+quarter have no segment inflow? Distinguishes three cases so the
+   sankey can explain itself instead of looking broken:
+     - 'unavailable' : company genuinely does not publish segment breakdowns
+                       (new schema: degraded:true + reason). E.g. SPCX/CBRS/LEGO/02513.HK/00100.HK.
+     - 'thisQuarter' : company DOES file segments, but not for THIS quarter
+                       (A-share/HK quarterly reports omit segments; only annual/interim carry them).
+     - 'noData'      : ticker absent from segments.json, or a legacy `degraded` note string
+                       recording that no usable segment split could be collected.
+   'ok' means a segment list exists for this quarter (no notice needed). */
+function segmentStatus(ticker, qEnd) {
+  const c = SEG && SEG.companies && SEG.companies[ticker];
+  if (!c) return { kind: 'noData' };
+  if (c.quarters && c.quarters[qEnd]) return { kind: 'ok' };
+  if (c.degraded === true) return { kind: 'unavailable', reason: c.reason || '' };
+  if (c.quarters && Object.keys(c.quarters).length > 0) return { kind: 'thisQuarter' };
+  return { kind: 'noData' }; // legacy degraded note string, or empty quarters
+}
+
+/* Responsive sankey padding. The left/right gutters used to be hard-coded 170/210px,
+   which is wider than the whole plot on a phone: at 390px the chart panel is 332px and
+   332-170-170 = -8px, so every node was squeezed to zero/negative width and the labels
+   piled on top of each other. Scale the gutters with the host instead, clamped so the
+   desktop geometry (host >= 773px -> base 170, left 210 when an aggregate column exists)
+   is byte-for-byte unchanged. */
+function sankeyPads(hasAgg) {
+  const host = document.getElementById('sankey');
+  const w = (host && host.clientWidth) || 1072;
+  const base = Math.round(Math.max(60, Math.min(170, w * 0.22)));
+  const left = hasAgg ? Math.min(210, base + 40) : base;
+  return { w, base, left, right: base, compact: base < 170 };
+}
+
+/* ECharts graphic notice shown in the empty input-side band of the sankey when a
+   company+quarter has no segment inflow. Placed left of the revenue column so it
+   never overlaps or squeezes the waterfall. */
+function segmentNoticeGraphic(plan) {
+  if (state.view === 'bar') return [];
+  // `plan` is the sankey segment plan (see sankeySegPlan); when omitted (e.g. cached
+  // __lastOption paths) recompute it so a fiscal-cumulative render still reports 'ok'.
+  const p = plan || sankeySegPlan(state.company, q());
+  const st = p.status;
+  if (st.kind === 'ok') return [];
+  let title, hint;
+  if (st.kind === 'unavailable') {
+    title = t('segUnavailableTitle'); hint = st.reason || t('segNoDataHint');
+  } else if (st.kind === 'thisQuarter') {
+    title = t('segQuarterTitle'); hint = t('segQuarterHint');
+  } else {
+    title = t('segNoDataTitle'); hint = t('segNoDataHint');
+  }
+  // Keep the text inside the EMPTY INPUT BAND, i.e. strictly left of the revenue column.
+  // The sankey series starts at `left` (170, or 210 when segment parents form an extra
+  // column), the notice starts at x=16, so the usable width is left-16-8 (8px gutter).
+  // A fixed 176 overran the revenue column at every common width: English words such as
+  // "segment" are unbreakable under overflow:'break', so the line ran past the band and
+  // painted over the 营收 column (AVGO/CRWV/000660.KS). `breakAll` breaks long unspaced
+  // words by character, and the capped width means even the 384-char 000660.KS reason
+  // wraps into more (fully readable) lines instead of poking out to the right.
+  const segList = p.segList;
+  const hasAgg = !!(segList && segList.some(s => s.children && s.children.length));
+  const pads = sankeyPads(hasAgg);
+  const padLeft = pads.left;            // MUST mirror the sankey series `left` below
+  // Never go below 48px: a 49px column of 11px text is still readable, while a negative
+  // width makes ECharts drop the whole notice.
+  const width = Math.max(48, Math.min(176, padLeft - 16 - 8));
+  return [{
+    type: 'text', left: 16, top: 'middle', z: 10, silent: true,
+    style: {
+      width, overflow: 'breakAll', lineHeight: pads.compact ? 15 : 19, fill: '#475569',
+      fontSize: pads.compact ? 11 : 12.5, fontWeight: 600, text: `${title}\n${hint}`,
+    },
+  }];
+}
+
+/* Degraded-waterfall badge: when a company discloses only revenue + net income (no gross profit,
+   no operating income) the sankey is a revenue→net shortcut whose residual block means "all
+   undisclosed costs + expenses + tax", NOT tax. A prominent in-chart banner makes the degraded
+   nature obvious (and is injected into the exported option too, unlike an HTML-only hint). */
+function degradedWaterfallGraphic(qv) {
+  if (state.view === 'bar') return [];
+  if (!qv || qv.gross != null || qv.opInc != null || qv.netInc == null) return [];
+  return [{
+    type: 'text', left: 16, top: 10, z: 10, silent: true,
+    style: {
+      width: 560, overflow: 'break', lineHeight: 18,
+      fill: '#92400e', backgroundColor: 'rgba(251,191,36,0.16)',
+      borderColor: '#f59e0b', borderWidth: 1, borderRadius: 4, padding: [5, 9],
+      fontSize: 12.5, fontWeight: 700, text: `⚠ ${t('degradedNotice')}`,
+    },
+  }];
+}
+
+/* ---- cumulative-period reconciliation (A 股/HK 半年报/年报分部) ----
+   CN filer segments are half-year/FY cumulative while the profit series holds
+   single quarters. When the segment period for the selected end date is
+   cumulative but the profit row is a single quarter, the sankey is rebuilt on
+   fiscal-year-to-date sums of the profit quarters (CN fiscal year = calendar
+   year) so the input side matches the revenue node instead of overstating it. */
+const CUM_SEG_TYPES = new Set(['half', 'FY', 'annual', 'mixed']);
+function profitRowIsCumulative(tk, qv) {
+  const e = DATA.companies[tk];
+  if (e.frequency === 'annual') return true; // 20-F rows are FY cumulative
+  if ((e.frequency === 'hk-mixed' || e.frequency === 'mixed') &&
+      (qv.periodType === 'annual' || qv.periodType === 'interim')) return true;
+  return false;
+}
+/* UNIFIED cumulative-period test — the single source of truth for "is this period an
+   accumulated total?". A segment point carries its OWN granularity in __segPT (half /
+   annual / quarter); a plain profit point falls back to profitRowIsCumulative. Every
+   label / decal / growth / legend decision routes through THIS, so an A-share half-year
+   segment point can never be treated as a single quarter just because its base profit row
+   happens to be periodType 'q' (fixes A1 growth + A3 hatching + A4 label). */
+function periodIsCumulative(tk, qv) {
+  if (!qv) return false;
+  if (qv.__segPT != null) return qv.__segPT !== 'quarter';
+  return profitRowIsCumulative(tk, qv);
+}
+function ytdSum(tk, qEnd, key) {
+  // fiscal-year-to-date native sum (CN fiscal year = calendar year).
+  // Preserve null semantics: a metric that no quarter in the window reports must
+  // stay null (returning 0 would fabricate a bogus gross/cogs branch in buildGraph,
+  // e.g. 桃李面包 reports revenue+netInc only, no gross/op/rd/sga).
+  let any = false, sum = 0;
+  for (const o of DATA.companies[tk].quarters) {
+    if (o.end.slice(0, 4) === qEnd.slice(0, 4) && o.end <= qEnd && o[key] != null) { any = true; sum += o[key]; }
+  }
+  return any ? sum : null;
+}
+/* Fiscal-year-end month for a ticker. The YTD sum above slices by calendar year, which
+   is only valid for December fiscal-year-end filers. For non-December FY companies
+   (e.g. SONY/BABA/ARM Mar-FY, 00992/00151.HK) a calendar slice would mix two fiscal
+   years, so cumulativeView() skips the correction entirely — keep the original numbers
+   rather than compute a wrong total. */
+function fiscalYearEndMonth(tk = state.company) {
+  const e = DATA.companies[tk] || {};
+  /* Authoritative source first: data/companies.json carries fiscalYearEndMonth per company,
+     verified against each filer's 10-K/20-F (or annual report) cover. The inference below
+     used to be the only source and guessed wrong for every non-December FYE — it read the
+     most common month among recent quarter ends, so AAPL (ends Dec/Mar/Jun/Sep) fell back to
+     December and MU (Aug/Sep-year-end, quarters in Nov/Feb/May) was read as November. */
+  const declared = Number((regOf(tk) || {}).fiscalYearEndMonth);
+  if (declared >= 1 && declared <= 12) return declared;
+  const annual = (e.quarters || []).filter(o => o.periodType === 'annual');
+  if (annual.length) return Number(annual[annual.length - 1].end.slice(5, 7));
+  const s = SEG && SEG.companies[tk];
+  if (s && s.periodTypes) {
+    const cnt = {};
+    for (const k in s.periodTypes) {
+      const tp = s.periodTypes[k];
+      if (tp === 'annual' || tp === 'FY') { const mm = Number(k.slice(5, 7)); cnt[mm] = (cnt[mm] || 0) + 1; }
+    }
+    const best = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0];
+    if (best) return Number(best[0]);
+  }
+  // fallback: most common month among recent quarter ends, December wins ties
+  const cnt = {};
+  (e.quarters || []).slice(-8).forEach(o => { const mm = Number(o.end.slice(5, 7)); cnt[mm] = (cnt[mm] || 0) + 1; });
+  const entries = Object.entries(cnt).sort((a, b) => b[1] - a[1]);
+  if (entries.length) {
+    const top = entries[0][1], tied = entries.filter(x => x[1] === top).map(x => Number(x[0]));
+    return tied.includes(12) ? 12 : tied[0];
+  }
+  return 12;
+}
+/* ---- bar x-axis period-basis labelling (半年/9M/FY 累计 vs 真单季) ----
+   The bar x-axis must say what each period point ACTUALLY covers, not merely map its
+   month to a calendar quarter. A 09633.HK H1 revenue point ends 06-30 but covers six
+   months, so "Q2" wrongly implies a single quarter and makes its bar look equivalent
+   to a quarterly bar. Derive the coverage from the fiscal-year-end month so
+   non-December FYE filers are labelled correctly: 00151.HK (FYE = 3) files an 09-30
+   interim that spans Apr–Sep = 6 months, i.e. H1 — not 9M as a naive month map implies. */
+function periodCoveredMonths(tk, qv) {
+  const endMonth = Number(qv.end.slice(5, 7));
+  const fye = fiscalYearEndMonth(tk);        // M, 1–12
+  const startMonth = (fye % 12) + 1;         // fiscal-year start month = M+1 (12 → 1)
+  return ((endMonth - startMonth + 12) % 12) + 1;
+}
+/* x-axis label for one bar point — single quarters keep Qn'yy; cumulative interims/full
+   years get H1'yy / 9M'yy / FY yyyy so the axis never misrepresents an accumulated total
+   as one quarter. Annual rows / annual-only series are unchanged (FY yyyy).
+   The quarter number AND the year are the company's FISCAL ones (fiscalQuarterOf), so a
+   Cisco bar ending 2026-10-24 reads Q1'27 (FY2027 Q1), not the calendar Q4'26. */
+function barPeriodLabel(tk, qv) {
+  const fye = fiscalYearEndMonth(tk);
+  const fq = fiscalQuarterOf(qv.end, fye);
+  const fyr = fq ? fq.fy : Number(qv.end.slice(0, 4));  // fiscal year the point belongs to
+  const yy = String(fyr).slice(2, 4);
+  const qn = fq ? fq.q : Math.floor((Number(qv.end.slice(5, 7)) - 1) / 3) + 1;
+  const single = `Q${qn}'${yy}`;                        // one true quarter, fiscal numbering
+  if (qv.periodType === 'annual' || isAnnual(tk)) return 'FY ' + fyr; // annual row / series
+  if (!periodIsCumulative(tk, qv)) return single;
+  const cm = periodCoveredMonths(tk, qv);
+  if (cm <= 3) return single;
+  if (cm <= 6) return `H1'${yy}`;
+  if (cm <= 9) return `9M'${yy}`;
+  return 'FY ' + fyr;                                   // >=10 months → full-year cumulative
+}
+/* Per-point basis descriptor for the bar view:
+     annualRow  — annual row / annual-only series (label already FY, keep plain)
+     cumulative — multi-quarter disclosure (tooltip writes the basis)
+     decal      — the H1 (4–6m) / 9M (7–9m) bars that get the hatched itemStyle
+     months     — covered months of the fiscal period ending at qv.end */
+function barBasisInfo(tk, qv) {
+  const annualRow = qv.periodType === 'annual' || isAnnual(tk);
+  const months = periodCoveredMonths(tk, qv);
+  const cumulative = !annualRow && periodIsCumulative(tk, qv) && months > 3;
+  return { annualRow, months, cumulative, decal: cumulative && months <= 9 };
+}
+/* shortest basis word for tooltips ('' = single quarter, no note) */
+function barBasisTag(tk, qv) {
+  const cm = periodCoveredMonths(tk, qv);
+  if (cm <= 3) return '';
+  if (cm <= 6) return 'H1';
+  if (cm <= 9) return '9M';
+  return 'FY';
+}
+function lighten(hex, amt) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const mix = c => Math.round(c + (255 - c) * amt).toString(16).padStart(2, '0');
+  return '#' + mix((n >> 16) & 255) + mix((n >> 8) & 255) + mix(n & 255);
+}
+const CUM_DECAL = { symbol: 'rect', symbolSize: 1, color: 'rgba(15,23,42,0.32)',
+  dashArrayX: [1, 0], dashArrayY: [2, 4], rotation: -Math.PI / 4 };
+
+function cumulativeView(tk, qv) {
+  const s = SEG && SEG.companies[tk];
+  if (!s) return null;
+  // Only reconcile when THIS period actually has a segment breakdown; otherwise the
+  // correction would rewrite the profit waterfall with no input side to match (e.g.
+  // Tencent/A-share quarters that only file annual/half-year segments).
+  if (!s.quarters || !s.quarters[qv.end]) return null;
+  const pt = (s.periodTypes && s.periodTypes[qv.end]) || s.periodType;
+  if (!CUM_SEG_TYPES.has(pt)) return null;       // segment is single-quarter → nothing to fix
+  if (profitRowIsCumulative(tk, qv)) return null; // profit row already cumulative
+  if (fiscalYearEndMonth(tk) !== 12) return null; // non-calendar FY → calendar YTD slice unsafe, skip
+  if (ytdQuartersCount(tk, qv.end) < 2) return null; // YTD window == the row itself
+  const sum = key => ytdSum(tk, qv.end, key);
+  // Distinguish H1 from full-year by the period-end month (CN data labels BOTH the
+  // 06-30 half and the 12-31 full year as periodType 'half'). 'annual'/'FY' are always FY.
+  const isFY = pt === 'FY' || pt === 'annual' || Number(qv.end.slice(5, 7)) === 12;
+  const label = isFY
+    ? (lang === 'zh' ? `FY${qv.end.slice(0, 4)} 全年累计` : `FY${qv.end.slice(0, 4)} cumulative`)
+    : (lang === 'zh' ? `${qv.end.slice(0, 4)} 上半年累计` : `H1 ${qv.end.slice(0, 4)} cumulative`);
+  return {
+    kind: isFY ? 'FY' : 'half', label,
+    values: { revenue: sum('revenue'), gross: sum('gross'), opInc: sum('opInc'),
+      netInc: sum('netInc'), rd: sum('rd'), sga: sum('sga') },
+  };
+}
+function ytdQuartersCount(tk, qEnd) {
+  return DATA.companies[tk].quarters.filter(o => o.end.slice(0, 4) === qEnd.slice(0, 4) && o.end <= qEnd).length;
+}
+
+/* ---- fiscal-year cumulative view for annual-only, non-December FY filers ----
+   Some HK filers (00992.HK Lenovo, FYE 31 Mar) publish segment splits ONLY as a
+   full-fiscal-year total, stored in segments.json under `annualQuarters` (the
+   quarterly `quarters` map is empty). profit.json still holds single-quarter rows.
+   cumulativeView() above cannot help: it slices by calendar year (only valid for a
+   December FYE) and requires a `quarters[end]` segment row.
+   So when the selected quarter IS the fiscal-year-end month and an `annualQuarters`
+   split exists for it, rebuild the sankey on the FY window: segment input side =
+   annualQuarters[end] (FY cumulative $M), profit side = the sum of every single
+   quarter inside [end − 12 months + 1 day, end] (for 00992 that is exactly the four
+   rows 06-30 / 09-30 / 12-31 / 03-31). Returns the SAME shape as cumulativeView()
+   ({kind,label,values}) so the render path is shared. Non-FY-end quarters (interim)
+   return null → the existing "no segment data + notice" behaviour is preserved. */
+function fiscalCumulativeView(tk, qv) {
+  const s = SEG && SEG.companies && SEG.companies[tk];
+  if (!s || !s.annualQuarters || !qv || !qv.end) return null;
+  const fye = fiscalYearEndMonth(tk);
+  if (fye === 12) return null;                               // calendar FY handled by cumulativeView
+  if (Number(qv.end.slice(5, 7)) !== fye) return null;       // only the FY-end quarter
+  const segs = s.annualQuarters[qv.end];
+  if (!segs || !segs.length) return null;
+  // FY window [end − 12 months + 1 day, end] — the +1 day excludes the prior FY-end
+  // quarter that a naive −12-month subtraction would wrongly include.
+  const endD = new Date(qv.end + 'T00:00:00Z');
+  const startD = new Date(qv.end + 'T00:00:00Z');
+  startD.setUTCFullYear(startD.getUTCFullYear() - 1);
+  startD.setUTCDate(startD.getUTCDate() + 1);
+  const startStr = startD.toISOString().slice(0, 10);
+  const rows = DATA.companies[tk].quarters.filter(
+    o => o.periodType !== 'annual' && o.end >= startStr && o.end <= qv.end);
+  if (rows.length < 4) return null;                          // not a full FY of single quarters
+  const sum = key => {
+    let any = false, acc = 0;
+    for (const o of rows) if (o[key] != null) { any = true; acc += o[key]; }
+    return any ? acc : null;                                 // preserve null (no fabricated branch)
+  };
+  const label = lang === 'zh'
+    ? `FY${qv.end.slice(0, 4)} 全年累计`
+    : `FY${qv.end.slice(0, 4)} cumulative`;
+  return {
+    kind: 'FY', label,
+    values: { revenue: sum('revenue'), gross: sum('gross'), opInc: sum('opInc'),
+      netInc: sum('netInc'), rd: sum('rd'), sga: sum('sga') },
+  };
+}
+
+/* Unified sankey segment plan for one raw quarter. Prefers the annual-only fiscal
+   cumulative view, then the existing calendar cumulative reconciliation, else draws
+   whatever single-quarter segment list exists. `status` is forced to 'ok' on the
+   fiscal path so segmentNoticeGraphic() does not paint a "no segment data" notice
+   over a view that DOES render segments. */
+function sankeySegPlan(ticker, qvRaw) {
+  const fyCum = fiscalCumulativeView(ticker, qvRaw);
+  if (fyCum) {
+    const c = SEG.companies[ticker];
+    return { cum: fyCum, segList: (c.annualQuarters && c.annualQuarters[qvRaw.end]) || null, status: { kind: 'ok' } };
+  }
+  return {
+    cum: cumulativeView(ticker, qvRaw),
+    segList: segmentsFor(ticker, qvRaw.end),
+    status: segmentStatus(ticker, qvRaw.end),
+  };
+}
+
+/* Merge sibling segments that share a name (some CN filers file two "其他" lines, e.g.
+   600887.SS 2026-06-30 / 688981.SS). Duplicate sankey node names break ECharts'
+   topological sort ("Cannot set properties of undefined"), and two identically labelled
+   nodes are meaningless to the reader — so their values are summed into one node. */
+function mergeSegs(list) {
+  const out = [], byName = new Map();
+  for (const s of list) {
+    let m = byName.get(s.name);
+    if (!m) {
+      m = { name: s.name, value: s.value != null ? s.value : 0,
+            children: s.children && s.children.length ? mergeSegs(s.children) : undefined };
+      byName.set(s.name, m); out.push(m);
+    } else {
+      if (s.value != null) m.value = (m.value || 0) + s.value;
+      if (s.children && s.children.length) {
+        if (!m.children) m.children = [];
+        for (const c of mergeSegs(s.children)) {
+          const ex = m.children.find(x => x.name === c.name);
+          if (ex) ex.value = (ex.value || 0) + (c.value || 0); else m.children.push(c);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/* Build the full echarts sankey graph ($B units) for the selected quarter.
+   Columns: [segments(+children) 0] [aggregate parents 1] [revenue] [gross/cogs] [rd/sga/other/op] [net/tax].
+   All values non-negative; out-slots of every node sum to its value. */
+function buildGraph(qv, segList) {
+  if (segList && segList.length) segList = mergeSegs(segList); // dedupe duplicate sibling names
+  const B = MB, M = 1, f = dispFactor(qv), sf = segFactor(qv);
+  const rev = qv.revenue * f / B, gross = qv.gross != null ? qv.gross * f / B : null,
+        op = qv.opInc != null ? qv.opInc * f / B : null, net = qv.netInc != null ? qv.netInc * f / B : null;
+  const nodes = [], links = [];
+  const hasChildren = segList && segList.some(s => s.children && s.children.length);
+  const revDepth = hasChildren ? 2 : (segList ? 1 : 0);
+  const segName = n => 'seg:' + n; // namespace so segments can never collide with computed node ids
+
+  // ---- input side ----
+  if (segList && segList.length) {
+    for (const s of segList) {
+      if (s.children && s.children.length) {
+        const parentVal = s.children.reduce((a, c) => a + c.value, 0) * sf / 1000;
+        for (const ch of s.children) {
+          nodes.push({ name: segName(ch.name), value: ch.value * sf / 1000, depth: 0, itemStyle: { color: BLUE } });
+          links.push({ source: segName(ch.name), target: segName(s.name), value: ch.value * sf / 1000 });
+        }
+        nodes.push({ name: segName(s.name), value: parentVal, depth: 1, itemStyle: { color: BLUE } });
+        links.push({ source: segName(s.name), target: 'revenue', value: parentVal });
+      } else {
+        nodes.push({ name: segName(s.name), value: s.value * sf / 1000, depth: 0, itemStyle: { color: BLUE } });
+        links.push({ source: segName(s.name), target: 'revenue', value: s.value * sf / 1000 });
+      }
+    }
+  }
+
+  // ---- revenue + output waterfall ----
+  nodes.push({ name: 'revenue', value: rev, depth: revDepth, itemStyle: { color: GRAY } });
+  const hasOpexSplit = qv.rd != null && qv.sga != null;
+
+  /* ---- shared tails -------------------------------------------------------------------
+     Both are pure placements of DISCLOSED values: they never invent a number, so every
+     block label still equals a real figure divided by B.
+     lossTail(lossB = |op|, lossDepth, netB): from a loss block down to the bottom line.
+       net < 0  → |net| block; the extra |net|-|op| (tax / non-operating items that deepen
+                  the loss) becomes its own red inflow, or a gold non-operating inflow when
+                  those items shrank the loss without flipping it positive;
+       net >= 0 → the loss is flipped positive by non-operating income: gold nonop
+                  (= net - op = net + |op|) between the loss block and the green net.
+     profitTail(opB, opDepth, netB): from a positive 'op' block down to the bottom line. */
+  function lossTail(lossB, lossDepth, netB) {
+    if (netB < 0) {
+      const netLossVal = -netB;
+      const deeper = netLossVal - lossB;   // = op - net: tax / non-op items that deepen the loss
+      nodes.push({ name: 'netLoss', value: netLossVal, depth: lossDepth + 1, itemStyle: { color: RED }, neg: true });
+      links.push({ source: 'loss', target: 'netLoss', value: Math.min(lossB, netLossVal) });
+      if (deeper > 0) {
+        nodes.push({ name: 'taxOther', value: deeper, depth: lossDepth, itemStyle: { color: RED }, neg: true });
+        links.push({ source: 'taxOther', target: 'netLoss', value: deeper });
+      } else if (deeper < 0) {
+        nodes.push({ name: 'nonop', value: -deeper, depth: lossDepth, itemStyle: { color: GOLD } });
+        links.push({ source: 'loss', target: 'nonop', value: -deeper });
+      }
+    } else {
+      nodes.push({ name: 'nonop', value: netB + lossB, depth: lossDepth, itemStyle: { color: GOLD } });
+      nodes.push({ name: 'net', value: netB, depth: lossDepth + 1, itemStyle: { color: GREEN } });
+      links.push({ source: 'loss', target: 'nonop', value: lossB });
+      links.push({ source: 'nonop', target: 'net', value: netB });
+    }
+  }
+  function profitTail(opB, opDepth, netB) {
+    if (netB >= 0) {
+      nodes.push({ name: 'net', value: netB, depth: opDepth + 1, itemStyle: { color: GREEN } });
+      links.push({ source: 'op', target: 'net', value: Math.min(netB, opB) });
+      if (opB - netB > 0) {
+        nodes.push({ name: 'taxOther', value: opB - netB, depth: opDepth + 1, itemStyle: { color: RED } });
+        links.push({ source: 'op', target: 'taxOther', value: opB - netB });
+      }
+      if (netB > opB) {
+        // the opAboveGross branch may already have created a nonop block feeding 'op'
+        // (op - gross). Grow that one instead of emitting a duplicate block name, so the block
+        // carries the whole non-operating income (net - gross) and both outflows are real.
+        const ex = nodes.find(n => n.name === 'nonop');
+        if (ex) { ex.value += netB - opB; links.push({ source: 'nonop', target: 'net', value: netB - opB }); }
+        else {
+          nodes.push({ name: 'nonop', value: netB - opB, depth: opDepth, itemStyle: { color: GOLD } });
+          links.push({ source: 'nonop', target: 'net', value: netB - opB });
+        }
+      }
+    } else {
+      nodes.push({ name: 'netLoss', value: -netB, depth: opDepth + 1, itemStyle: { color: RED } });
+      nodes.push({ name: 'taxOther', value: opB, depth: opDepth + 1, itemStyle: { color: RED } });
+      links.push({ source: 'op', target: 'taxOther', value: opB });
+      links.push({ source: 'taxOther', target: 'netLoss', value: -netB });
+    }
+  }
+
+  // A reported gross profit of zero or less needs its own statement: the old code drew a
+  // zero-height (or negative) 'gross' block and cleanLinks() dropped the negative ribbon.
+  const grossNeg = gross != null && gross <= 0;
+  if (grossNeg) {
+    /* ---- NEGATIVE gross profit (gross <= 0) ----
+       Reported cost of revenue exceeds revenue, so there is no positive gross block to draw.
+       Draw the real statement instead of dropping out of the waterfall:
+          revenue → cogs       all revenue funds cost of revenue
+          cogs                 real size = revenue - gross (= revenue + |gross|): taller than
+                               its inflow, and that overhang IS the negative gross
+          cogs    → grossNeg   the |gross| overshoot, labelled as a negative gross profit
+          grossNeg → loss      the operating loss continues from the negative gross
+          opex     → loss      operating expenses beyond the negative gross (source block)
+       Sizes are disclosed ones: cogs = revenue - gross, opex = gross - op (= |op| - |gross|),
+       loss = |op|, netLoss = |net|. The loss block's inflow sums to |op| exactly
+       (|gross| + opex), so nothing is stretched and no value is a plug.
+       This branch takes priority over the op<0 && gross>0 branch below: a period is drawn
+       by exactly one of them. */
+    const negG = -gross;                     // |gross| > 0
+    const cogsVal = rev - gross;             // = revenue + |gross|: cost of revenue really is this big
+    nodes.push({ name: 'cogs', value: cogsVal, depth: revDepth + 1, itemStyle: { color: RED } });
+    nodes.push({ name: 'grossNeg', value: negG, depth: revDepth + 2, itemStyle: { color: RED }, neg: true });
+    links.push({ source: 'revenue', target: 'cogs', value: rev });
+    links.push({ source: 'cogs', target: 'grossNeg', value: negG });
+    if (op != null && op < 0) {
+      const loss = -op;                      // |op| (> |gross| whenever opex > 0)
+      const opexExtra = gross - op;          // |op| - |gross|: expenses past the negative gross
+      nodes.push({ name: 'opex', value: opexExtra, depth: revDepth + 2, itemStyle: { color: RED } });
+      nodes.push({ name: 'loss', value: loss, depth: revDepth + 3, itemStyle: { color: RED }, neg: true });
+      links.push({ source: 'grossNeg', target: 'loss', value: negG });
+      if (opexExtra > 0) links.push({ source: 'opex', target: 'loss', value: opexExtra });
+      if (net != null) lossTail(loss, revDepth + 3, net);
+    } else if (op != null) {
+      // negative gross but a positive operating income (rare): keep the disclosed op
+      nodes.push({ name: 'op', value: op, depth: revDepth + 3, itemStyle: { color: GREEN } });
+      links.push({ source: 'grossNeg', target: 'op', value: Math.min(negG, op) });
+      if (net != null) profitTail(op, revDepth + 3, net);
+    } else if (net != null) {
+      if (net < 0) {
+        nodes.push({ name: 'netLoss', value: -net, depth: revDepth + 3, itemStyle: { color: RED }, neg: true });
+        links.push({ source: 'grossNeg', target: 'netLoss', value: Math.min(negG, -net) });
+      } else {
+        nodes.push({ name: 'net', value: net, depth: revDepth + 3, itemStyle: { color: GREEN } });
+        links.push({ source: 'grossNeg', target: 'net', value: Math.min(negG, net) });
+      }
+    }
+  } else if (gross != null) {
+
+    nodes.push({ name: 'gross', value: gross, depth: revDepth + 1, itemStyle: { color: GREEN } });
+    nodes.push({ name: 'cogs', value: rev - gross, depth: revDepth + 1, itemStyle: { color: RED } });
+    links.push({ source: 'revenue', target: 'gross', value: gross });
+    if (rev - gross > 0) links.push({ source: 'revenue', target: 'cogs', value: rev - gross });
+    if (op != null && op >= 0 && op <= gross) {
+      nodes.push({ name: 'op', value: op, depth: revDepth + 2, itemStyle: { color: GREEN } });
+      const opexVal = gross - op;
+      if (hasOpexSplit && qv.rd * f / B + qv.sga * f / B <= opexVal * 1.001) {
+        nodes.push({ name: 'rd', value: qv.rd * f / B, depth: revDepth + 2, itemStyle: { color: RED } });
+        nodes.push({ name: 'sga', value: qv.sga * f / B, depth: revDepth + 2, itemStyle: { color: RED } });
+        const other = opexVal - qv.rd * f / B - qv.sga * f / B;
+        if (other > 0) { nodes.push({ name: 'opex', value: other, depth: revDepth + 2, itemStyle: { color: RED } }); links.push({ source: 'gross', target: 'opex', value: other }); }
+        links.push({ source: 'gross', target: 'rd', value: qv.rd * f / B });
+        links.push({ source: 'gross', target: 'sga', value: qv.sga * f / B });
+      } else {
+        nodes.push({ name: 'opex', value: opexVal, depth: revDepth + 2, itemStyle: { color: RED } });
+        links.push({ source: 'gross', target: 'opex', value: opexVal });
+      }
+      links.push({ source: 'gross', target: 'op', value: op });
+    } else if (op != null && op < 0 && gross > 0) {
+      /* ---- operating LOSS (op < 0) ----
+         Semantics: operating expenses are larger than gross profit by exactly |op|.
+         There is no positive 'op' node to draw, so the loss is spelled out instead of
+         truncating the chart at gross (the old behaviour for all 61 companies):
+            gross → opex   carries the gross profit that actually funds the expenses
+            opex           real disclosed size = gross - op = gross + |op|
+            opex → loss    the |op| that the expenses overshoot by
+         The opex block is therefore taller than its inflow by exactly the loss. ECharts
+         sankey sizes a block at max(value, in-sum, out-sum), so nothing is rescaled and
+         no figure is invented — the same "inflow < node value" allowance that
+         DEGRADED_RESIDUAL already depends on (it is also why out-sums may be smaller
+         than the block). Bottom line:
+            net < 0  → red netLoss, the extra |net|-|op| (tax / non-operating) drawn as
+                       its own red inflow, or a gold nonop inflow when non-op income
+                       shrank the loss without turning it positive;
+            net >= 0 → the loss is flipped positive by non-operating income: gold nonop
+                       block (= net - op) between the loss and the green net.
+         Every label shows the real data value (|op|, |net|, net-op), never a plug. */
+      const loss = -op;                       // |op| > 0
+      const opexVal = gross - op;             // gross + |op|: real operating expenses
+      nodes.push({ name: 'opex', value: opexVal, depth: revDepth + 2, itemStyle: { color: RED } });
+      links.push({ source: 'gross', target: 'opex', value: gross });
+      nodes.push({ name: 'loss', value: loss, depth: revDepth + 2, itemStyle: { color: RED }, neg: true });
+      links.push({ source: 'opex', target: 'loss', value: loss });
+      if (net != null) lossTail(loss, revDepth + 2, net);
+    } else if (op != null && op > gross) {
+      /* Operating income reported ABOVE gross profit (6 periods: the opInc figure carries other
+         income, or gross is understated). opex = gross - op would be a NEGATIVE expense block, so
+         instead show the shortfall as a gold non-operating inflow: gross funds the op block as far
+         as it reaches, and the rest (op - gross) comes in as nonop. The op block equals opInc, its
+         inflows sum to it exactly, and the shared tail below paints net / taxOther / nonop off it. */
+      nodes.push({ name: 'op', value: op, depth: revDepth + 2, itemStyle: { color: GREEN } });
+      nodes.push({ name: 'nonop', value: op - gross, depth: revDepth + 2, itemStyle: { color: GOLD } });
+      links.push({ source: 'gross', target: 'op', value: gross });
+      links.push({ source: 'nonop', target: 'op', value: op - gross });
+    } else if (op == null && net != null && net < 0 && gross > 0) {
+      /* Gross profit disclosed, operating income missing, bottom line a loss
+         (00100.HK 2025-12-31: gross ¥0.14B, net -¥13.16B). The chart used to stop at
+         gross and hide the loss. Draw all gross profit into a netLoss block sized by
+         the disclosed |net|; the block is taller than the inflow, and that overhang is
+         the undisclosed opex + tax that produced the loss — no plug value invented. */
+      nodes.push({ name: 'netLoss', value: -net, depth: revDepth + 2, itemStyle: { color: RED }, neg: true });
+      links.push({ source: 'gross', target: 'netLoss', value: Math.min(gross, -net) });
+    } else if (op == null && net != null && net >= 0) {
+      /* Operating income missing, bottom line disclosed and PROFITABLE — 101 periods that
+         used to stop at gross (MSFT 2007-09…2008-06, IBM 2009-2010, …). Split the gross
+         profit into the part that reached the bottom line and the part that did not:
+            gross → net       (green) the disclosed net income
+            gross → residual  (red)   gross - net: costs & taxes between gross and net
+         The two outflows sum to gross exactly, so no block is stretched and no figure is a
+         plug; the residual reuses the DEGRADED_RESIDUAL name and wording because it is the
+         same unknowable ("undisclosed costs & taxes").
+         net > gross cannot be a cost gap — non-operating income lifted the bottom line above
+         gross — so the surplus is a gold nonop inflow into net instead of a negative red
+         residual. (No such period exists in the current data; kept so the rule is total.) */
+      if (net > gross) {
+        nodes.push({ name: 'nonop', value: net - gross, depth: revDepth + 2, itemStyle: { color: GOLD } });
+        nodes.push({ name: 'net', value: net, depth: revDepth + 3, itemStyle: { color: GREEN } });
+        links.push({ source: 'gross', target: 'net', value: gross });
+        links.push({ source: 'nonop', target: 'net', value: net - gross });
+      } else {
+        nodes.push({ name: 'net', value: net, depth: revDepth + 2, itemStyle: { color: GREEN } });
+        links.push({ source: 'gross', target: 'net', value: net });
+        if (gross - net > 0) {
+          nodes.push({ name: DEGRADED_RESIDUAL, value: gross - net, depth: revDepth + 2, itemStyle: { color: RED } });
+          links.push({ source: 'gross', target: DEGRADED_RESIDUAL, value: gross - net });
+        }
+      }
+    }
+  } else if (op != null && op >= 0) {
+    nodes.push({ name: 'op', value: op, depth: revDepth + 1, itemStyle: { color: GREEN } });
+    nodes.push({ name: 'opex', value: rev - op, depth: revDepth + 1, itemStyle: { color: RED } });
+    links.push({ source: 'revenue', target: 'op', value: op });
+    links.push({ source: 'revenue', target: 'opex', value: rev - op });
+  } else if (op != null && op < 0) {
+    /* Gross profit not disclosed, but opInc IS — and negative (SBUX 2020-06-28, SONY 2009/2012,
+       LKNCY 2018…2021 …). The old code fell through to the revenue→net fallback and silently
+       dropped the operating loss. Draw revenue → residual → loss: the residual block is
+       revenue-sized and its out-sum is |op|, the untouched gap being the undisclosed cost of
+       revenue. net/tax are then painted by the shared loss tail. */
+    nodes.push({ name: DEGRADED_RESIDUAL, value: rev, depth: revDepth + 1, itemStyle: { color: RED } });
+    nodes.push({ name: 'loss', value: -op, depth: revDepth + 2, itemStyle: { color: RED }, neg: true });
+    links.push({ source: 'revenue', target: DEGRADED_RESIDUAL, value: rev });
+    links.push({ source: DEGRADED_RESIDUAL, target: 'loss', value: -op });
+    if (net != null) lossTail(-op, revDepth + 2, net);
+  } else if (net != null) {
+    // no gross/op disclosed (HK-style revenue+netProfit only): pure waterfall revenue → net
+    if (net >= 0) {
+      nodes.push({ name: 'net', value: net, depth: revDepth + 1, itemStyle: { color: GREEN } });
+      links.push({ source: 'revenue', target: 'net', value: Math.min(net, rev) });
+      if (rev - net > 0) { nodes.push({ name: DEGRADED_RESIDUAL, value: rev - net, depth: revDepth + 1, itemStyle: { color: RED } }); links.push({ source: 'revenue', target: DEGRADED_RESIDUAL, value: rev - net }); }
+    } else {
+      nodes.push({ name: 'netLoss', value: -net, depth: revDepth + 1, itemStyle: { color: RED } });
+      nodes.push({ name: DEGRADED_RESIDUAL, value: rev, depth: revDepth + 1, itemStyle: { color: RED } });
+      links.push({ source: 'revenue', target: DEGRADED_RESIDUAL, value: rev });
+      links.push({ source: DEGRADED_RESIDUAL, target: 'netLoss', value: -net });
+    }
+  }
+  // the tail hangs off the 'op' block, so it must never run when that block was not painted
+  if (!grossNeg && op != null && op > 0 && net != null && nodes.some(n => n.name === 'op')) profitTail(op, revDepth + 2, net);
+
+  const cleanLinks = links.filter(l => l.value > 0 && l.source !== l.target)
+    .map(l => ({ ...l, lineStyle: { color: linkColor(l), opacity: FLOW_OPACITY, curveness: 0.5 } }));
+  return { nodes, links: cleanLinks };
+}
+function linkColor(l) {
+  if (l.source.startsWith('seg:')) return BLUE; // all input-side ribbons (children→parent, parent/segment→revenue)
+  if (l.source === 'nonop') return GOLD;
+  if (l.target === 'nonop') return GOLD; // loss → nonop inflow (operating loss cancelled by non-op income)
+  if (l.target === 'gross' || l.target === 'op' || l.target === 'net') return GREEN;
+  return RED; // cogs / rd / sga / opex / taxOther / netLoss branches
+}
+const displayName = n => n.name.startsWith('seg:') ? n.name.slice(4) : tn(n.name);
+
+/* Adaptive amount text for labels / tooltips / %-mode amount line / PNG-SVG export. Values
+   arrive in display-$B; one decimal of a billion is 100M, so a 58.9M figure printed as "0.1B"
+   is off by ~70%. Anything under 1B is therefore printed in millions (58.9M, 1.4M); >= 1B keeps
+   one decimal (12.3B). Node values are never touched here — this is print only.
+   NOTE: the brief's middle band (0.01 ≤ |v| < 1 → two decimals, e.g. "0.059B") is deliberately
+   not used: it renders 0.0589 as "0.06B", which still buries the figure, while the acceptance
+   criterion asks the reader to see "58.9M". One rule for all sub-billion amounts keeps the
+   unit predictable across every block of the same chart. */
+const amtText = v => {
+  const a = Math.abs(v);
+  return a >= 1 ? `${a.toFixed(1)}B` : `${(a * 1000).toFixed(1)}M`;
+};
+
+/* Width in full-width columns (CJK / full-width punctuation = 2, ASCII = 1) and its
+   "full-width character equivalent" (columns / 2), the budget below is written in that unit. */
+const fwCols = s => Array.from(s).reduce((n, ch) => n + (ch.codePointAt(0) > 0x2e7f ? 2 : 1), 0);
+const LABEL_MAX_FW = 12; // 12 full-width character equivalents = 24 columns
+const SHORT_NAME_KEY = { undisclosedCost: 'undisclosedCostShort' };
+/* Long block names are shortened for the on-canvas label (> 12 full-width equivalents would
+   wrap into 3-4 lines and run off the right edge at 1280px); the tooltip keeps the full
+   wording. The short form is a hand-written name, never a truncation of the full one. */
+function labelName(n) {
+  const full = displayName(n);
+  const key = SHORT_NAME_KEY[n.name];
+  if (!key || fwCols(full) / 2 <= LABEL_MAX_FW) return full;
+  return tn(key);
+}
+
+/* self-consistency check: input-side leaf inflows must equal revenue */
+function checkConsistency(qv, g) {
+  const f = dispFactor(qv), B = MB;
+  const out = { quarter: qv.end, inputSum: null, revenue: qv.revenue * f / B, ok: null, waterfall: {} };
+  const leafLinks = g.links.filter(l => l.source.startsWith('seg:') &&
+    !g.nodes.some(n => n.name === l.source && n.depth === 1)); // leaves, not aggregate parents
+  const inputSum = leafLinks.reduce((a, l) => a + l.value, 0);
+  out.inputSum = inputSum;
+  out.ok = Math.abs(inputSum - out.revenue) < 0.005;
+  const byName = Object.fromEntries(g.nodes.map(n => [n.name, n.value]));
+  out.waterfall = {
+    gross: byName.gross, cogs: byName.cogs, op: byName.op, net: byName.net,
+    grossEq: byName.gross == null || Math.abs(byName.gross + (byName.cogs || 0) - out.revenue) < 0.005,
+    opEq: byName.op == null || qv.gross == null || Math.abs(byName.op + (byName.rd || 0) + (byName.sga || 0) + (byName.opex || 0) - byName.gross) < 0.01,
+    netEq: byName.net == null || Math.abs(byName.net - qv.netInc * f / B) < 0.005,
+  };
+  return out;
+}
+
+function renderChart() {
+  if (state.view === 'bar') { window.__qvEff = null; renderBarChart(); return; }
+  const qvRaw = q();
+  // cumulative-period reconciliation: A 股半年/全年分部 vs 单季 profit 行, plus the
+  // annual-only non-Dec-FY path (e.g. 00992.HK) resolved through the same plan helper.
+  const plan = sankeySegPlan(state.company, qvRaw);
+  const cum = plan.cum;
+  const qv = cum ? { ...qvRaw, ...cum.values, __cum: cum } : qvRaw;
+  window.__qvEff = cum ? qv : null; // qoq helpers read the effective (cumulative) period
+  const segList = plan.segList;
+  const segStatus = plan.status;
+  const segGraphic = segmentNoticeGraphic(plan);
+  const degradedGraphic = degradedWaterfallGraphic(qv);
+  const graphicAll = [...segGraphic, ...degradedGraphic];
+  const g = buildGraph(qv, segList);
+  window.__bridgeCheck = checkConsistency(qv, g);
+  // signed sum of the input-side segment values (display $B); for 00992 this includes
+  // the negative 抵銷/elimination line so it reconciles to consolidated revenue.
+  const segSumB = (plan.segList || []).reduce((a, s) => a + (s.value || 0), 0) * segFactor(qv) / MB;
+  window.__sankeyMeta = {
+    company: state.company, quarter: qv.end, segmentStatus: segStatus.kind,
+    cumulative: cum ? { kind: cum.kind, label: cum.label } : null,
+    segmentSum: +segSumB.toFixed(4), revenue: +(qv.revenue * dispFactor(qv) / MB).toFixed(4),
+    nodes: g.nodes.map(n => ({ name: displayName(n), value: +n.value.toFixed(4), depth: n.depth })),
+    links: g.links.map(l => ({ source: displayName({ name: l.source }), target: displayName({ name: l.target }), value: +l.value.toFixed(4) })),
+  };
+
+  // A7: when the sankey is rebuilt on a cumulative basis, the title must speak in
+  // fiscal-period terms ("2026 上半年累计"), not bolt a contradictory "Q2 2026" in front.
+  document.getElementById('chartTitle').textContent =
+    cum ? `${shortName(state.company)} · ${cum.label}`
+        : `${shortName(state.company)} ${quarterLabel(qv.end, qv.periodType)}`;
+
+  const hasAgg = !!(segList && segList.some(s => s.children && s.children.length));
+  const pads = sankeyPads(hasAgg);
+  const compactLabel = pads.compact; // host < 773px: 390/768 phones and small tablets
+  const labelRich = {
+    n: { fontSize: compactLabel ? 13 : 16, fontWeight: 700, color: '#1e293b', lineHeight: compactLabel ? 17 : 21, textBorderColor: '#fff', textBorderWidth: 2.5 },
+    v: { fontSize: compactLabel ? 11.5 : 14, fontWeight: 600, color: '#52607a', lineHeight: compactLabel ? 15 : 18, textBorderColor: '#fff', textBorderWidth: 2.5 },
+    p: { fontSize: compactLabel ? 11.5 : 14, fontWeight: 700, color: '#2563eb', lineHeight: compactLabel ? 15 : 18, textBorderColor: '#fff', textBorderWidth: 2.5 },   // share of revenue
+    m: { fontSize: compactLabel ? 11.5 : 14, fontWeight: 700, color: '#1d55a5', lineHeight: compactLabel ? 15 : 18, textBorderColor: '#fff', textBorderWidth: 2.5 },   // margin ratios
+    up: { fontSize: compactLabel ? 11 : 13, fontWeight: 700, color: '#16a34a', lineHeight: compactLabel ? 14 : 17, textBorderColor: '#fff', textBorderWidth: 2.5 },
+    down: { fontSize: compactLabel ? 11 : 13, fontWeight: 700, color: '#dc2626', lineHeight: compactLabel ? 14 : 17, textBorderColor: '#fff', textBorderWidth: 2.5 },
+    flat: { fontSize: compactLabel ? 11 : 13, fontWeight: 600, color: '#52607a', lineHeight: compactLabel ? 14 : 17, textBorderColor: '#fff', textBorderWidth: 2.5 }, // '—' no prior data
+  };
+
+  /* label formatter with 4 modes: amount / pct / qoq / pct+qoq. Node values untouched. */
+  function nodeLabel(p) {
+    const revB = qv.revenue * dispFactor(qv) / MB;
+    const isMargin = MARGIN_KEYS.includes(p.name);
+    // loss nodes (neg:true) hold |opInc| / |netInc| as a positive value so ECharts can
+    // size the block, but the reader must see the sign of the real disclosure.
+    const neg = p.data && p.data.neg === true;
+    // adaptive unit: ≥1B keeps one decimal, below that the amount is printed in M so a
+    // 58.9M revenue can never read as "0.1B" (see amtText).
+    const amt = `${neg ? '−' : ''}${dispSym()}${amtText(p.value)}`;
+    let body = `{n|${labelName(p)}}`;
+    const parts = [];
+    if (state.mode.pct) {
+      if (isMargin) {
+        // BUG-B: numerator (rawMetrics) is in the DISPLAY currency (already ×dispFactor);
+        // the denominator must be the same display-currency revenue, NOT the native
+        // qv.revenue — otherwise EUR/JPY/KRW/TWD/CHF/DKK filers are off by fxToUsd.
+        const rm = rawMetrics(qv);
+        const mg = (rm && rm[p.name] != null && rm.revenue) ? rm[p.name] / rm.revenue : null;
+        parts.push(`{m|${t('margins')[p.name]} ${fmtPct(mg)}}`);
+      } else if (p.name === 'revenue') {
+        parts.push('{p|100%}');
+      } else {
+        parts.push(p.name.startsWith('seg:')
+          ? `{p|${fmtPct(p.value / revB)}}`
+          : `{p|${neg ? '−' : ''}${fmtPct(p.value / revB)} ${t('ofRev')}}`);
+      }
+    }
+    parts.push(`{v|${amt}}`);
+    body += '\n' + parts.join(' · ');
+    if (state.mode.qoq) {
+      const qt = qoqText(p.name);
+      if (qt === '—') body += `\n{flat|— QoQ}`;
+      else if (qt === t('qoqNA')) body += `\n{flat|${qt}}`; // cumulative period → QoQ not meaningful
+      else {
+        const neg = qt.startsWith('-');
+        body += `\n{${neg ? 'down' : 'up'}|${qt} ${qoqSuffix()}}`;
+      }
+    }
+    return body;
+  }
+
+  /* The degraded residual block is huge and its honest name is long; anchor it to the RIGHT of
+     the (last-column) block and re-wrap the name onto short lines so it fits the right margin
+     instead of colliding with the tiny 'net' label stacked at the top of the same column. */
+  function residualLabel(p) {
+    const revB = qv.revenue * dispFactor(qv) / MB;
+    const name = labelName(p); // short form: the full wording would wrap into 4 lines at 1280px
+    const maxChars = lang === 'zh' ? 9 : 17;
+    const lines = [];
+    let line = '';
+    for (const ch of name) {
+      line += ch;
+      if (line.length >= maxChars) { lines.push(line); line = ''; }
+    }
+    if (line) lines.push(line);
+    let out = lines.map(l => `{n|${l}}`).join('\n');
+    const parts = [];
+    if (state.mode.pct) parts.push(`{p|${fmtPct(p.value / revB)}}`);
+    parts.push(`{v|${dispSym()}${amtText(p.value)}}`);
+    out += '\n' + parts.join(' · ');
+    return out;
+  }
+
+  const degraded = qv.gross == null && qv.opInc == null && qv.netInc != null;
+  const data = g.nodes.map(n => {
+    const d = { name: n.name, value: n.value, depth: n.depth, itemStyle: n.itemStyle };
+    if (n.neg) d.neg = true; // loss node: value is |opInc| / |netInc|, label must read negative
+    // per-node label placement to avoid overlaps (pitfall #3)
+    if (n.name === DEGRADED_RESIDUAL) {
+      // huge residual: label to its right (into the right margin), wrapped onto short lines
+      d.label = { position: 'right', distance: 8, formatter: residualLabel };
+    } else if (degraded && n.name === 'net') {
+      // tiny net node: keep its label above the block, clear of the residual label at mid-right
+      d.label = { position: 'top', distance: 6, formatter: nodeLabel };
+    } else if (n.name === 'revenue') {
+      d.label = { position: 'top', distance: 6, formatter: nodeLabel };
+    } else if (n.depth === 0 && (!segList || !segList.some(s => s.children && s.children.length))) {
+      d.label = { position: 'right', distance: 6 };   // no aggregate column: safe right of node
+    } else if (n.depth >= (segList && segList.some(s => s.children && s.children.length) ? 2 : (segList ? 1 : 0)) + 3) {
+      d.label = { position: 'right', distance: 8 };   // last column (or deeper: negative-gross chains): label right, no conflicts
+    } else {
+      d.label = { position: 'top', distance: 5 };
+    }
+    // Narrow hosts cannot fit every per-segment label: below 2% of revenue the text is
+    // wider than the node and ECharts would stack it over its neighbours. Hide just the
+    // label (d.label.show=false); the node, its link and the item tooltip stay intact.
+    if (compactLabel && n.name.startsWith('seg:') && qv.revenue) {
+      const revB = qv.revenue * dispFactor(qv) / MB;
+      if (revB > 0 && n.value / revB < 0.02) d.label = { show: false };
+    }
+    return d;
+  });
+  // Degraded views carry an amber banner in the top margin; bump the plot's top inset so the
+  // banner never sits on top of the revenue label (which is drawn just above the revenue node).
+  const sankeyTop = degraded ? 96 : 60;
+
+  chart.setOption({
+    backgroundColor: 'transparent',
+    graphic: graphicAll,
+    tooltip: {
+      trigger: 'item', confine: true,
+      formatter: p => {
+        const nm = displayName(p);
+        return p.dataType === 'edge'
+          ? `${displayName({ name: p.data.source })} → ${displayName({ name: p.data.target })}<br/><b>${dispSym()}${amtText(p.data.value)}</b>`
+          : `<b>${nm}</b><br/>${dispSym()}${amtText(p.value)}`;
+      },
+    },
+    series: [{
+      type: 'sankey',
+      layout: 'none',               // manual depth layout (pitfall #5)
+      nodeAlign: 'justify',
+      nodeWidth: 30, nodeGap: 22,
+      left: pads.left, right: pads.right, top: sankeyTop, bottom: 40,
+      emphasis: { focus: 'adjacency' },
+      ...(compactLabel ? { avoidLabelOverlap: true, labelLayout: { hideOverlap: true } } : {}),
+      label: {
+        fontSize: compactLabel ? 12 : 15,
+        formatter: nodeLabel,
+        rich: labelRich,
+        textBorderColor: '#fff', textBorderWidth: 2.5, // white halo keeps labels legible over colored flow bands
+      },
+      data,                          // FULL data + links every time (pitfall #1)
+      links: g.links,
+    }],
+  }, true); // notMerge: full replacement on every company/quarter switch
+  window.__lastOption = {
+    backgroundColor: '#f2efe9',
+    tooltip: undefined,
+    graphic: graphicAll,
+    series: [{
+      type: 'sankey', layout: 'none', nodeAlign: 'justify',
+      nodeWidth: 30, nodeGap: 22, left: pads.left, right: pads.right, top: sankeyTop, bottom: 40,
+      emphasis: { focus: 'adjacency' },
+      ...(compactLabel ? { avoidLabelOverlap: true, labelLayout: { hideOverlap: true } } : {}),
+      label: { fontSize: compactLabel ? 12 : 15, formatter: nodeLabel, rich: labelRich, textBorderColor: '#fff', textBorderWidth: 2.5 },
+      data, links: g.links,
+    }],
+  };
+}
+
+/* ---- bar (time-series) view: x = all quarters, y = one selectable sub-item ---- */
+const BAR_PROFIT_ITEMS = ['revenue', 'gross', 'op', 'net', 'cogs', 'rd', 'sga', 'taxOther'];
+const BAR_MARGIN_ITEMS = ['gross', 'op', 'net'];
+const MARGIN_COLOR = '#1d55a5';
+
+/* top-level OR child segment value for name in a given quarter; null when absent.
+   BUG-C: merge duplicate sibling names first (mergeSegs) so the bar value matches the
+   sankey's merged node — e.g. 600887.SS/688981.SS file two "其他" lines that must be
+   summed (previously `find` returned only the first, understating the bar and its share). */
+function segValueFor(ticker, qEnd, name) {
+  const list = segmentsFor(ticker, qEnd);
+  if (!list) return null;
+  const merged = mergeSegs(list);
+  const top = merged.find(s => s.name === name);
+  if (top) return top.value;
+  for (const s of merged) { const ch = (s.children || []).find(c => c.name === name); if (ch) return ch.value; }
+  return null;
+}
+
+/* disclosed single periods for the bar view — mixed-frequency entries (hk-mixed/mixed)
+   draw only the actually disclosed single quarters; derived annual rows are excluded
+   (no double counting, no fabricated equal-spacing axis) */
+function barQuarters(ticker) {
+  const e = DATA.companies[ticker];
+  return (e.frequency === 'hk-mixed' || e.frequency === 'mixed')
+    ? e.quarters.filter(qv => qv.periodType !== 'annual')
+    : e.quarters;
+}
+
+/* ---- segment bar item: x-axis = the sub-item's OWN disclosed period ends ----
+   Segments are reported annually (BIDU/JD/…), semi-annually (A-share) or quarterly
+   (NVDA/MSFT/…). Plotting a segment on the profit-quarter axis leaves most cells empty
+   (annual-only filers → every quarter misses). For a segment sub-item we instead plot
+   exactly the ends where that name HAS a value, preserving its own granularity, and reuse
+   the real profit row at each end so basis label / per-period fx / share-denominator logic
+   stay identical to the profit-item path. */
+function segPeriodType(ticker, end) {
+  const s = SEG && SEG.companies[ticker];
+  const pt = s && s.periodTypes && s.periodTypes[end];
+  if (pt === 'annual' || pt === 'FY') return 'annual';
+  // A5: some filers (Samsung 005930.KS / LG 066570.KS) tag the 12-31 segment point as
+  // 'quarter' in segments.json periodTypes, but its value IS the full fiscal year (it
+  // matches the profit row's annual 12-31 row — ~4× a normal quarter). Trust the profit
+  // row: an annual profit row at this end means the segment value is annual too. The
+  // share denominator already uses full-year revenue, so only the axis/label change here.
+  const qrow = DATA.companies[ticker] && DATA.companies[ticker].quarters.find(o => o.end === end);
+  if (qrow && qrow.periodType === 'annual') return 'annual';
+  if (pt === 'half' || pt === 'H1' || pt === 'semiannual') return 'half';
+  return 'quarter';
+}
+function segPeriods(ticker, name) {
+  const s = SEG && SEG.companies[ticker];
+  if (!s) return [];
+  const keys = new Set();
+  if (s.quarters) for (const en of Object.keys(s.quarters)) keys.add(en);
+  if (s.annualQuarters) for (const en of Object.keys(s.annualQuarters)) keys.add(en); // annualQuarters-only filers
+  const byEnd = new Map();
+  for (const qv of (DATA.companies[ticker] ? DATA.companies[ticker].quarters : [])) byEnd.set(qv.end, qv);
+  const ends = [...keys].filter(en => segValueFor(ticker, en, name) != null).sort();
+  return ends.map(en => {
+    const base = byEnd.get(en);
+    const pt = segPeriodType(ticker, en);
+    const row = base ? { ...base } : { end: en, periodType: pt === 'annual' ? 'annual' : (pt === 'half' ? 'interim' : 'q') };
+    row.end = en;
+    row.__segPT = pt;
+    return row;
+  });
+}
+/* x-axis label for a segment period, keyed off its OWN granularity (not the profit row's).
+   Quarter numbering is the company's fiscal one (same rule as barPeriodLabel). */
+function segPeriodLabel(ticker, qv) {
+  const pt = qv.__segPT || 'quarter';
+  const yr = qv.end.slice(0, 4), mm = Number(qv.end.slice(5, 7));
+  const fq = fiscalQuarterOf(qv.end, fiscalYearEndMonth(ticker));
+  const fyr = fq ? fq.fy : fiscalYearOf(qv.end, ticker), yy = String(fyr).slice(2, 4);
+  const qn = fq ? fq.q : Math.floor((mm - 1) / 3) + 1;
+  if (pt === 'annual') return 'FY ' + fyr;
+  if (pt === 'quarter') return `Q${qn}'${yy}`;
+  const cm = periodCoveredMonths(ticker, qv);
+  if (cm <= 6) return `H1'${yy}`;
+  if (cm <= 9) return `9M'${yy}`;
+  return 'FY ' + fyr;
+}
+/* disclosure-granularity word for the chart title; null = pure quarterly (keep original copy) */
+function segGranularityLabel(periods) {
+  const pts = new Set((periods || []).map(p => p.__segPT || 'quarter'));
+  if (pts.size === 1 && pts.has('quarter')) return null; // quarterly → leave the original wording alone
+  const order = [['annual', lang === 'zh' ? '年度' : 'annual'], ['half', lang === 'zh' ? '半年' : 'half-year'], ['quarter', lang === 'zh' ? '季度' : 'quarterly']];
+  const names = order.filter(([k]) => pts.has(k)).map(([, v]) => v);
+  if (pts.size === 1) return lang === 'zh' ? '仅' + names[0] + '披露' : names[0] + ' only';
+  return lang === 'zh' ? names.join('+') + '披露' : names.join(' + ') + ' disclosure';
+}
+
+/* Every selectable bar item for a company, with its full-history series precomputed.
+   groups: items (income-statement lines, $B) / segments (from segments.json, $B) / margins (%). */
+function buildBarItems(ticker) {
+  const qs = barQuarters(ticker);
+  const f0 = dispInUsd(ticker) ? 1 : 1 / (qs[qs.length - 1] && qs[qs.length - 1].fxToUsd != null ? qs[qs.length - 1].fxToUsd : 1); // segment scale (per-period fx differs; segments only exist on US cos anyway)
+  const out = [];
+  for (const id of BAR_PROFIT_ITEMS) {
+    const data = qs.map(qv => { const m = rawMetrics(qv); return m && m[id] != null ? m[id] / MB : null; });
+    out.push({ id, label: tn(id), group: 'items', kind: 'amount', color: NODE_COLORS[id], data, hasData: data.some(v => v != null) });
+  }
+  const segNames = [];
+  if (SEG && SEG.companies[ticker]) {
+    const co = SEG.companies[ticker];
+    const seen = new Set();
+    const lists = [].concat(
+      co.quarters ? Object.values(co.quarters) : [],
+      co.annualQuarters ? Object.values(co.annualQuarters) : [], // annualQuarters-only filers (00992.HK)
+    );
+    for (const list of lists)
+      for (const s of list)
+        for (const nm of [s.name, ...(s.children || []).map(c => c.name)])
+          if (!seen.has(nm)) { seen.add(nm); segNames.push(nm); }
+  }
+  for (const nm of segNames) {
+    // per-item axis: only the ends where this sub-item actually has a value (own granularity)
+    const periods = segPeriods(ticker, nm);
+    const data = periods.map(qv => { const v = segValueFor(ticker, qv.end, nm); return v != null ? v * segFactor(qv, ticker) / MB : null; });
+    out.push({ id: 'seg:' + nm, segName: nm, label: nm, group: 'segments', kind: 'segment', color: BLUE, data, periods, hasData: data.some(v => v != null) });
+  }
+  for (const mk of BAR_MARGIN_ITEMS) {
+    const data = qs.map(qv => { const m = rawMetrics(qv); return m && m.revenue && m[mk] != null ? m[mk] / m.revenue * 100 : null; });
+    out.push({ id: 'margin:' + mk, mk, label: t('margins')[mk], group: 'margins', kind: 'margin', color: MARGIN_COLOR, data, hasData: data.some(v => v != null) });
+  }
+  return out;
+}
+
+/* dropdown in the header: grouped 利润科目/分部/利润率; no-data items disabled + tagged */
+function renderBarSelect() {
+  const sel = document.getElementById('barSelect');
+  const items = buildBarItems(state.company);
+  if (!items.some(i => i.id === state.barItem)) state.barItem = 'revenue'; // new company may lack the old pick
+  sel.innerHTML = ['items', 'segments', 'margins'].map(g => {
+    const gi = items.filter(i => i.group === g);
+    if (!gi.length) return '';
+    return `<optgroup label="${t('barGroups')[g]}">` + gi.map(i =>
+      `<option value="${i.id}"${i.id === state.barItem ? ' selected' : ''}${i.hasData ? '' : ' disabled'}>${i.label}${i.hasData ? '' : ' (' + t('barNoDataTag') + ')'}</option>`
+    ).join('') + '</optgroup>';
+  }).join('');
+  sel.style.display = state.view === 'bar' ? '' : 'none';
+  sel.onchange = () => { state.barItem = sel.value; renderChart(); };
+}
+
+/* full echarts bar option: x = all quarters (no holes), y = selected item.
+   pct/qoq modes annotate the tooltip (bar height always stays the raw amount —
+   a 64-bar % -of-revenue chart would flatten the scale and lose the trend). */
+function renderBarChart() {
+  const qs = barQuarters(state.company);
+  const items = buildBarItems(state.company);
+  const item = items.find(i => i.id === state.barItem) || items[0];
+  // axis rows: segment items carry their OWN disclosed period ends (item.periods);
+  // every other item keeps the profit-quarter axis (qs) byte-for-byte.
+  const rows = item.kind === 'segment' ? (item.periods || []) : qs;
+  // period-basis aware axis: cumulative interims/full-years → H1'yy / 9M'yy / FY, so a
+  // six-month total never masquerades as a single "Q2" bar (see barPeriodLabel)
+  const perRowLabel = qv => (item.kind === 'segment' ? segPeriodLabel(state.company, qv) : barPeriodLabel(state.company, qv));
+  const labels = rows.map(perRowLabel);
+  const bases = rows.map(qv => barBasisInfo(state.company, qv));
+  const hasCumPoint = bases.some(b => b.decal); // series contains H1/9M cumulative bars
+  const hasAny = item.data.some(v => v != null);
+  const isMargin = item.kind === 'margin';
+  // Amount text follows the same adaptive B/M rule as the sankey (amtText): a 98.9M
+  // bar must read "$98.9M", never the old "$0.1B" (which is 1% off and hides the unit
+  // switch). Values themselves stay in $B; this is print only. Negative bars (losses)
+  // keep an explicit minus sign before the currency symbol.
+  const fmtVal = v => isMargin ? v.toFixed(1) + '%' : (v < 0 ? '−' : '') + dispSym() + amtText(v);
+  // BUG-D: segment bars for half/FY periods carry cumulative values (as disclosed), so
+  // cumulativeView() tells us the matching YTD revenue + a '上半年累计 / FY全年累计' label.
+  const cumFor = qv => (item.kind === 'segment' ? cumulativeView(state.company, qv) : null);
+  const hasCumSeg = item.kind === 'segment' && rows.some(qv => cumFor(qv));
+  // legend/notice: a fixed-height, absolutely-positioned chip → toggling it never shifts
+  // the chart or the timeline (no layout jump); hidden entirely when no cumulative bars.
+  {
+    const note = document.getElementById('barBasisNote');
+    if (note) {
+      note.textContent = lang === 'zh'
+        ? '斜纹柱 = 半年/9M 累计，与单季柱不可直接相比'
+        : 'Hatched bars = H1/9M cumulative, not comparable to single quarters';
+      note.classList.toggle('show', hasCumPoint);
+    }
+  }
+  const allInterim = rows.length > 0 && rows.every(qv => qv.periodType === 'interim');
+  // segment items whose disclosure is NOT purely quarterly get an explicit granularity +
+  // year range in the title (e.g. 百度 · Search Services · 仅年度披露 2013–2025); purely
+  // quarterly segments keep the original wording.
+  const segGran = item.kind === 'segment' ? segGranularityLabel(rows) : null;
+  let titleBasis;
+  if (item.kind === 'segment' && segGran) {
+    const yrs = rows.map(qv => qv.end.slice(0, 4));
+    const range = yrs.length ? (yrs[0] === yrs[yrs.length - 1] ? yrs[0] : yrs[0] + '–' + yrs[yrs.length - 1]) : '';
+    titleBasis = ' · ' + segGran + (range ? ' ' + range : '');
+  } else {
+    titleBasis = hasAny ? ' · ' + t(isAnnual() ? 'barFullHistoryAnnual' : (allInterim ? 'barFullHistorySemiannual' : 'barFullHistory')) : '';
+  }
+  document.getElementById('chartTitle').textContent =
+    `${shortName(state.company)} · ${item.label}${titleBasis}`
+    + (hasCumSeg ? ' · ' + (lang === 'zh' ? '分部为半年/FY累计口径' : 'segments on half/FY cumulative basis') : '');
+  // keep the cumulative-basis chip below the (possibly multi-line) title now that the header
+  // is a flow stack — the title can wrap to several lines, so anchor the chip to its box edge.
+  {
+    const ttl = document.getElementById('chartTitle'), note = document.getElementById('barBasisNote');
+    if (ttl && note) note.style.top = (ttl.offsetTop + ttl.offsetHeight + 4) + 'px';
+  }
+
+  /* overlay lines follow the SELECTED item (占比/环比 buttons toggle each line):
+     ① share-of-revenue % line (margin items are already % → line = the value itself)
+     ② QoQ/YoY growth line (annual series → 同比; margin items → pp change)
+     null (missing data / no prior period) breaks the line — no fake points. */
+  // BUG-E: when the selected item IS revenue, "营收 / 营收" is identically 100% — a flat,
+  // information-free line that also pins the right % axis to 100 and flattens the growth line.
+  // Skip the share line entirely for revenue (every other item keeps it unchanged).
+  const isRevenue = item.id === 'revenue';
+  const showPct = barLines.pct && !isRevenue;
+  const pctLine = isRevenue ? [] : item.data.map((v, i) => {
+    if (v == null) return null;
+    if (isMargin) return +v.toFixed(2);
+    const qv = rows[i];
+    // BUG-A: bar values are $B but rawMetrics().revenue is $M → ×MB before dividing
+    //        (previously omitted, shrinking every amount share 1000×).
+    // BUG-D: a cumulative segment bar must divide by the same YTD cumulative revenue
+    //        the sankey uses, not by the single quarter's revenue.
+    let revDisp;
+    if (item.kind === 'segment') {
+      const cum = cumFor(qv);
+      revDisp = (cum && cum.values && cum.values.revenue != null)
+        ? cum.values.revenue * dispFactor(qv)
+        : (rawMetrics(qv) || {}).revenue;
+    } else {
+      revDisp = (rawMetrics(qv) || {}).revenue;
+    }
+    return revDisp ? +(v * MB / revDisp * 100).toFixed(2) : null;
+  });
+  /* Cumulative-period guard: an interim/annual (半年报/FY累计) point is NOT comparable to the
+     preceding bar — that mixes e.g. an H1 total with a single quarter and yields a bogus "QoQ".
+     For such a point compute YoY against the SAME MM-DD one year earlier (located by date, never
+     a fixed i-2/i-4 offset); if there is no such base → null (break the line). If the *previous*
+     point is cumulative (base period inconsistent) we also refuse a QoQ. */
+  const yoyBaseIndex = i => {
+    const cur = rows[i]; if (!cur) return -1;
+    const md = cur.end.slice(5), yoy = String(Number(cur.end.slice(0, 4)) - 1);
+    for (let j = i - 1; j >= 0; j--) if (rows[j].end.slice(5) === md && rows[j].end.slice(0, 4) === yoy) return j;
+    return -1;
+  };
+  // per-point basis: 'qoq' | 'yoy' | null (null = no valid comparable base → line breaks)
+  // Growth must be computed on the RAW reported series, not the display-scaled one: a CNY
+  // segment bar is multiplied by a PER-PERIOD fx factor (segFactor uses qv.fxToUsd), so a
+  // YoY computed on displayed values carries the fx drift of the two periods and misstates
+  // the real growth (e.g. 600887 奶粉 H1'25 true +15.8% but showed +14.3%). Compare raw.
+  const growthSrc = item.kind === 'segment'
+    ? item.periods.map(p => { const v = segValueFor(state.company, p.end, item.segName); return v == null ? null : v; })
+    : item.data;
+  const growthBasis = [];
+  const growthLine = growthSrc.map((gv, i) => {
+    const pd0 = item.data[i - 1]; // display value only used for the margin (pp) branch below
+    if (isMargin) { // margin items are ratios → keep the pp change (unchanged behaviour)
+      growthBasis[i] = (gv == null || i === 0 || pd0 == null) ? null : 'qoq';
+      return (gv == null || i === 0 || pd0 == null) ? null : +(gv - pd0).toFixed(2);
+    }
+    if (isAnnual()) { // annual series: every bar is an FY → prior FY is already YoY (keep as-is)
+      growthBasis[i] = (gv == null || i === 0 || growthSrc[i - 1] == null) ? null : 'yoy';
+      return (gv == null || i === 0 || growthSrc[i - 1] == null) ? null : +((gv - growthSrc[i - 1]) / Math.abs(growthSrc[i - 1]) * 100).toFixed(2);
+    }
+    const cumCur = periodIsCumulative(state.company, rows[i]);
+    const cumPrev = i > 0 && periodIsCumulative(state.company, rows[i - 1]);
+    if (cumCur) { // cumulative point → YoY vs same MM-DD last year
+      const b = yoyBaseIndex(i), pv = b >= 0 ? growthSrc[b] : null;
+      growthBasis[i] = (gv == null || pv == null) ? null : 'yoy';
+      return (gv == null || pv == null) ? null : +((gv - pv) / Math.abs(pv) * 100).toFixed(2);
+    }
+    if (cumPrev) { growthBasis[i] = null; return null; } // QoQ base is cumulative → inconsistent, break
+    growthBasis[i] = (gv == null || i === 0 || growthSrc[i - 1] == null) ? null : 'qoq';
+    return (gv == null || i === 0 || growthSrc[i - 1] == null) ? null : +((gv - growthSrc[i - 1]) / Math.abs(growthSrc[i - 1]) * 100).toFixed(2);
+  });
+  // legend suffix from the actual basis mix of the line (single source of truth = growthBasis):
+  //   all-YoY (every comparable point cumulative: A股 半年/年度分部, annual segment filers)
+  //     → plain 同比/YoY — never mislabel a cumulative series as "环比" (A1/A4)
+  //   YoY + QoQ mix (quarterly series containing cumulative interim points)
+  //     → "环比（累计期用同比）" so neither basis is hidden
+  //   pure quarterly → qoqSuffix()
+  const basisSet = new Set(growthBasis.filter(Boolean));
+  const growthSuffix = basisSet.has('yoy') && !basisSet.has('qoq')
+    ? (lang === 'zh' ? '同比' : 'YoY')
+    : (basisSet.has('yoy') && basisSet.has('qoq')
+        ? (lang === 'zh' ? '环比（累计期用同比）' : 'QoQ (YoY on cumulative)')
+        : qoqSuffix());
+  const pctName = `${item.label} · ${t('ofRev')}${isMargin ? '' : ' %'}`;
+  const growthName = `${item.label} · ${growthSuffix}${isMargin ? ' (pp)' : ' %'}`;
+  const lineSeries = [
+    ...(showPct ? [{
+      name: pctName, type: 'line', yAxisIndex: 1, data: pctLine,
+      symbol: 'circle', symbolSize: 5, connectNulls: false,
+      lineStyle: { color: '#b91c1c', width: 2 }, itemStyle: { color: '#b91c1c' },
+    }] : []),
+    ...(barLines.qoq ? [{
+      name: growthName, type: 'line', yAxisIndex: 1, data: growthLine,
+      symbol: 'circle', symbolSize: 5, connectNulls: false,
+      lineStyle: { color: '#0f766e', width: 2 }, itemStyle: { color: '#0f766e' },
+    }] : []),
+  ];
+  // per-point bar styling: H1/9M cumulative bars get a lighter same-hue fill + a hatched
+  // decal (ECharts 5 itemStyle.decal — renders in both SVG and canvas/PNG exports) so
+  // they are visually distinct from single-quarter bars; every other point stays plain.
+  const barSeriesData = item.data.map((v, i) => (bases[i] && bases[i].decal && v != null)
+    ? { value: v, itemStyle: { color: lighten(item.color, 0.34), decal: CUM_DECAL } }
+    : v);
+
+  const opt = {
+    backgroundColor: 'transparent',
+    // BUG-F: legend lives in its OWN band above the plot (grid.top raised to leave room)
+    // and is 'scroll' with a bounded width, so long cumulative-period names can never
+    // overlap each other at any chart width and never sit on a data line / the % axis line.
+    legend: lineSeries.length ? {
+      type: 'scroll', top: 30, left: 'center', width: '72%',
+      itemWidth: 14, itemHeight: 8, itemGap: 16,
+      textStyle: { color: '#475569', fontSize: 12 },
+      pageIconColor: '#475569', pageIconSize: 10,
+    } : undefined,
+    tooltip: {
+      trigger: 'axis', confine: true,
+      formatter: params => {
+        const arr = Array.isArray(params) ? params : [params];
+        const p = arr[0];
+        const i = p.dataIndex, qv = rows[i], val = item.data[i];
+        const cum = cumFor(qv); // cumulative-basis label for half/FY segment points
+        const b = bases[i];
+        // cumulative bar point → state the coverage basis explicitly (H1/9M/FY 累计),
+        // so the tooltip cannot imply a single quarter; single quarters keep existing form.
+        const head = (b && b.cumulative)
+          ? `${barBasisTag(state.company, qv)} ${lang === 'zh' ? '累计' : 'cumulative'}`
+          : quarterLabel(qv.end, qv.periodType);
+        const lines = [`<b>${head}</b> <span style="color:#94a3b8">${qv.end}</span>${cum && !(b && b.cumulative) ? ' · ' + cum.label : ''}`];
+        if (val == null) {
+          lines.push('—');
+        } else {
+          lines.push(`<b>${fmtVal(val)}</b>`);
+          // P2: share comes from the SAME pctLine series as the overlay line — single
+          // source of truth, so the tooltip can no longer show a correct % and a bogus
+          // 0.0% side by side. barLines.pct is the bar-view 占比 button.
+          if (showPct && !isMargin && pctLine[i] != null) {
+            lines.push(`${t('ofRev')} ${pctLine[i].toFixed(1)}%`);
+          }
+        }
+        for (const s of arr) { // overlay lines
+          if (s.seriesName === pctName) {
+            if (!isMargin) continue; // amount shares already rendered above from pctLine
+            lines.push(`${pctName}: ${s.value == null ? '—' : s.value.toFixed(1) + '%'}`);
+          } else if (s.seriesName === growthName) {
+            if (s.value == null) { lines.push(`${item.label} · —`); continue; }
+            // mark the basis per point: cumulative periods use YoY, never pretend it is QoQ
+            const basisLbl = growthBasis[i] === 'yoy' ? (lang === 'zh' ? '同比' : 'YoY') : qoqSuffix();
+            lines.push(`${item.label} · ${basisLbl}: ${(s.value > 0 ? '+' : '') + s.value.toFixed(1) + (isMargin ? 'pp' : '%')}`);
+          }
+        }
+        return lines.join('<br/>');
+      },
+    },
+    /* time-window slider (e.g. 2020–2023): drag/hover the bottom slider or
+       scroll-zoom inside the chart; bars + lines rescale together */
+    dataZoom: [
+      {
+        type: 'slider', xAxisIndex: 0, height: 20, bottom: 10, brushSelect: false,
+        borderColor: '#d8dee9', backgroundColor: '#ffffff',
+        fillerColor: 'rgba(37,99,235,.14)', handleStyle: { color: '#2563eb' },
+        moveHandleStyle: { color: '#2563eb' }, emphasis: { handleStyle: { borderColor: '#2563eb' } },
+        dataBackground: { lineStyle: { color: '#94a3b8' }, areaStyle: { color: 'rgba(148,163,184,.18)' } },
+        selectedDataBackground: { lineStyle: { color: '#2563eb' }, areaStyle: { color: 'rgba(37,99,235,.15)' } },
+        textStyle: { color: '#52607a', fontSize: 10 },
+      },
+      { type: 'inside', xAxisIndex: 0 },
+    ],
+    grid: { left: 64, right: lineSeries.length ? 56 : 24, top: 66, bottom: 92 }, // top:66 leaves a clear band above the % axis line for the legend
+    xAxis: {
+      type: 'category', data: labels,
+      axisLabel: { rotate: 45, fontSize: 11, color: '#52607a', interval: 'auto', hideOverlap: true },
+      axisLine: { lineStyle: { color: '#cbd5e1' } }, axisTick: { alignWithLabel: true },
+    },
+    yAxis: [
+      {
+        type: 'value', name: isMargin ? '%' : dispSym() + 'B', nameTextStyle: { color: '#52607a' },
+        axisLabel: { color: '#52607a' }, splitLine: { lineStyle: { color: '#e2e6ee' } },
+      },
+      ...(lineSeries.length ? [{
+        type: 'value', name: '%', position: 'right', nameTextStyle: { color: '#52607a' },
+        axisLabel: { color: '#52607a', formatter: '{value}%' }, splitLine: { show: false },
+      }] : []),
+    ],
+    graphic: hasAny ? [] : [{ type: 'text', left: 'center', top: 'middle',
+      style: { text: t('barNoData'), fontSize: 20, fontWeight: 600, fill: '#52607a' } }],
+    series: [
+      { name: item.label, type: 'bar', data: barSeriesData, barMaxWidth: 16,
+        itemStyle: { color: item.color, borderRadius: [2, 2, 0, 0] } },
+      ...lineSeries,
+    ],
+  };
+  chart.setOption(opt, true); // notMerge: full replacement every time (pitfall #1)
+  // re-apply the remembered time window (company switch / re-render must not
+  // reset the user's zoom — see switchCompany state-memory)
+  if (window.__barZoom) chart.dispatchAction({ type: 'dataZoom', xAxisIndex: 0, start: window.__barZoom.start, end: window.__barZoom.end });
+  window.__barMeta = { company: state.company, item: item.id, kind: item.kind, labels, data: item.data, ends: rows.map(qv => qv.end), quarterCount: rows.length,
+    bases, hasCumPoint, pctLine, growthLine, growthBasis, showPct, linesShown: lineSeries.map(s => s.name) };
+  window.__lastOption = { ...opt, backgroundColor: '#f2efe9', tooltip: undefined }; // WYSIWYG PNG export
+}
+
+
+/* ---- left logo rail ---- */
+const MONO_COLORS = ['#1d55a5','#b91c1c','#0f766e','#7c3aed','#c2410c','#be185d','#15803d','#a16207','#1e40af','#4d7c0f'];
+/* Phone layout keeps the 92-logo wall folded behind this count chip; keeping the
+   label/aria state in one helper means language switches and renders stay in sync. */
+function syncLogoToggle() {
+  const rail = document.getElementById('logoRail');
+  const toggle = document.getElementById('logoToggle');
+  if (!rail || !toggle) return;
+  const open = rail.classList.contains('open');
+  const n = Object.keys(DATA.companies).length;
+  const count = document.getElementById('logoCount');
+  if (count) count.textContent = lang === 'zh' ? `${n} 家公司` : `${n} companies`;
+  const caret = toggle.querySelector('.caret');
+  if (caret) caret.textContent = open ? '▴' : '▾';
+  toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+function renderLogoRail() {
+  const rail = document.getElementById('logoRail');
+  const toggle = document.getElementById('logoToggle');
+  /* build DOM once; subsequent renders only toggle classes — re-creating <img>
+     nodes on company switch re-fetched logos and made the rail visibly jitter */
+  if (rail.dataset.built !== '1' || rail.dataset.lang !== lang) {
+    rail.innerHTML = Object.keys(DATA.companies).map((tk, i) => {
+      const c = DATA.companies[tk];
+      return `<div class="logo${tk === state.company ? ' active' : ''}${c.preview ? ' preview' : ''}" data-sym="${tk}" title="${tk} · ${regOf(tk)?.nameZh || ZH_NAMES_FALLBACK[tk] || ''}">
+         <img src="data/logos/${tk}.png" alt="${tk}"
+           onerror="this.outerHTML='<div class=\\'mono\\' style=\\'background:${regOf(tk)?.color || MONO_COLORS[i % MONO_COLORS.length]}\\'>${tk.slice(0, 2)}</div>'">
+         ${c.preview ? '<span class="pvBadge">Preview</span>' : ''}
+       </div>`;
+    }).join('');
+    rail.querySelectorAll('.logo').forEach(el => el.addEventListener('click', () => switchCompany(el.dataset.sym)));
+    rail.dataset.built = '1'; rail.dataset.lang = lang;
+  }
+  if (toggle && toggle.dataset.bound !== '1') {
+    toggle.addEventListener('click', () => {
+      rail.classList.toggle('open');
+      syncLogoToggle();
+    });
+    toggle.dataset.bound = '1';
+  }
+  syncLogoToggle();
+  /* incremental update: active highlight + industry visibility, no DOM rebuild */
+  rail.querySelectorAll('.logo').forEach(el => {
+    const tk = el.dataset.sym;
+    el.classList.toggle('active', tk === state.company);
+    // union of selected industries; empty selection = all
+    el.classList.toggle('hidden',
+      state.industries.length > 0 && !industriesOf(tk).some(id => state.industries.includes(id)));
+  });
+}
+
+/* ---- industry filter bar (top of page, above the logo rail) ----
+   single-select: clicking a category selects it; clicking it again (or 全部/All)
+   deselects → all logos visible */
+function renderIndustryBar() {
+  const bar = document.getElementById('industryBar');
+  if (bar.dataset.built !== '1' || bar.dataset.lang !== lang) {
+    const counts = {};
+    Object.keys(DATA.companies).forEach(tk => industriesOf(tk).forEach(id => { counts[id] = (counts[id] || 0) + 1; }));
+    const btn = (id, label, cnt) => `<button class="indBtn" data-ind="${id}">${label}<span class="cnt">${cnt}</span></button>`;
+    const all = lang === 'zh' ? '全部' : 'All';
+    bar.innerHTML = btn('all', all, Object.keys(DATA.companies).length)
+      + INDUSTRY_GROUPS.map(g => btn(g.id, lang === 'zh' ? g.zh : g.en, counts[g.id] || 0)).join('');
+    bar.querySelectorAll('.indBtn').forEach(el => el.addEventListener('click', () => {
+      const id = el.dataset.ind;
+      if (id === 'all') state.industries = [];
+      else state.industries = (state.industries[0] === id) ? [] : [id]; // single-select, click again to clear
+      syncHash(); // URL hash sync (replaceState: no history spam)
+      render();
+    }));
+    bar.dataset.built = '1'; bar.dataset.lang = lang;
+  }
+  bar.querySelectorAll('.indBtn').forEach(el => el.classList.toggle('active',
+    el.dataset.ind === 'all' ? state.industries.length === 0 : state.industries.includes(el.dataset.ind)));
+}
+
+/* ---- company switch with view-state memory ----
+   Keep everything the user has dialed in (view mode, pct/qoq toggles, bar item,
+   dataZoom window, selected reporting date, currency) — only the date is
+   re-aligned when the new company lacks that exact period (nearest quarter,
+   with a soft hint). Never resets to defaults on switch. */
+function switchCompany(tk) {
+  if (!DATA.companies[tk] || tk === state.company) return;
+  const prevEnd = curQIndex() != null ? DATA.companies[state.company].quarters[curQIndex()]?.end : null;
+  state.company = tk;
+  const qs = DATA.companies[tk].quarters;
+  if (prevEnd && qs.length) {
+    let best = -1, bestD = Infinity;
+    qs.forEach((qv, i) => {
+      const d = Math.abs(new Date(qv.end + 'T00:00:00Z') - new Date(prevEnd + 'T00:00:00Z'));
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    state.qIndex = best;
+    if (qs[best].end !== prevEnd) // exact period missing → nearest, with a soft hint
+      showHint(lang === 'zh' ? `该公司无 ${prevEnd} 期，已对齐至最近可用期 ${qs[best].end}` : `No ${prevEnd} period for this company — aligned to nearest: ${qs[best].end}`);
+  } else state.qIndex = null; // "latest" stays latest
+  if (!canToggleCur()) state.curMode = 'native'; // currency toggle only exists for CNY reporters
+  render();
+}
+
+/* transient toast (bottom center): used for quarter realignment notices */
+let hintTimer = null;
+function showHint(msg) {
+  let el = document.getElementById('hintToast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'hintToast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+/* ---- URL hash: full view state (shareable / refresh-stable) ----
+   #c=<ticker>&q=<period-end>&v=bar&m=<barItem>&z=<start>-<end>&ind=<industryId> */
+function syncHash() {
+  const p = new URLSearchParams();
+  if (state.company !== 'NVDA') p.set('c', state.company);
+  const ci = curQIndex();
+  if (ci != null) p.set('q', DATA.companies[state.company].quarters[ci].end);
+  if (state.view !== 'bridge') p.set('v', state.view);
+  if (state.view === 'bar' && state.barItem !== 'revenue') p.set('m', state.barItem);
+  if (window.__barZoom) p.set('z', `${Math.round(window.__barZoom.start)}-${Math.round(window.__barZoom.end)}`);
+  if (state.industries.length) p.set('ind', state.industries[0]);
+  const h = p.toString();
+  const url = location.pathname + location.search + (h ? '#' + h : '');
+  history.replaceState ? history.replaceState(null, '', url) : (location.hash = h);
+}
+function applyHash() {
+  const hp = new URLSearchParams(location.hash.slice(1));
+  const tk = hp.get('c');
+  if (tk && DATA.companies[tk]) state.company = tk;
+  const v = hp.get('v');
+  if (v === 'bar' || v === 'bridge') state.view = v;
+  const mi = hp.get('m');
+  if (mi) state.barItem = mi; // renderBarSelect falls back to 'revenue' if missing
+  const q = hp.get('q');
+  if (q && /^\d{4}-\d{2}-\d{2}$/.test(q)) {
+    const qs = DATA.companies[state.company].quarters;
+    let best = -1, bestD = Infinity;
+    qs.forEach((qv, i) => {
+      const d = Math.abs(new Date(qv.end + 'T00:00:00Z') - new Date(q + 'T00:00:00Z'));
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    state.qIndex = best >= 0 && bestD < 100 * 864e5 ? best : null; // >100d off → ignore, use latest
+  }
+  const z = hp.get('z');
+  if (z && /^\d{1,3}-\d{1,3}$/.test(z)) {
+    const [a, b] = z.split('-').map(Number);
+    if (a < b) window.__barZoom = { start: Math.max(0, a), end: Math.min(100, b) };
+  }
+  // industry deep-link: #ind=<id> (single-select; legacy comma lists → first value)
+  const ind = hp.get('ind');
+  if (ind) state.industries = [ind.split(',')[0]].filter(id => INDUSTRY_GROUPS.some(g => g.id === id));
+}
+
+/* ---- bottom timeline ---- */
+function curQIndex() { return state.qIndex == null ? DATA.companies[state.company].quarters.length - 1 : state.qIndex; }
+function setQuarter(i) {
+  const n = DATA.companies[state.company].quarters.length;
+  i = Math.max(0, Math.min(n - 1, i));
+  if (i === curQIndex()) { renderTimeline(); return; }
+  state.qIndex = i;
+  render(); // full setOption(data+links) via renderChart — never partial updates
+}
+function yearOf(end) { return new Date(end + 'T00:00:00Z').getUTCFullYear(); }
+function renderTimeline() {
+  const qs = DATA.companies[state.company].quarters, n = qs.length, cur = curQIndex();
+  const ticks = document.getElementById('tlTicks');
+  // year-dedup sampling: always keep the first, last and active quarter, plus one
+  // representative per calendar year — the same year never gets two ticks. The
+  // active tick additionally shows the full quarter-end date; sampled ticks show
+  // the bare year (with 64 quarters a "Y Qx + date" label set overflows the track).
+  const order = [cur, n - 1, 0];
+  const byYear = new Map();
+  // a year tick represents that year's LAST reported quarter, so clicking "2019"
+  // lands on the year-end period (index 0 stays pinned below for the data start)
+  for (let i = 0; i < n; i++) { const y = yearOf(qs[i].end); byYear.set(y, i); }
+  for (const i of [...byYear.values()].sort((a, b) => a - b)) order.push(i);
+  const usedYears = new Set(), show = [];
+  for (const i of order) {
+    const y = yearOf(qs[i].end);
+    if (usedYears.has(y)) continue;
+    usedYears.add(y); show.push(i);
+  }
+  show.sort((a, b) => a - b);
+  const paint = list => {
+    ticks.innerHTML = list.map(i =>
+      `<div class="tl-tick${i === cur ? ' active' : ''}" data-i="${i}" title="${qs[i].end}">
+         <div class="q">${yearOf(qs[i].end)}</div>${i === cur ? `<div class="d">${qs[i].end}</div>` : ''}</div>`).join('');
+  };
+  /* Narrow screens: 19 year labels cannot fit 220-600px, so thin the row to the
+     coarsest step that still FITS instead of letting `space-between` glue the
+     labels together and clip the recent years behind #chartPanel's overflow.
+     First/last/active are always kept. Ticks are measured after paint, so the
+     active tick's wider date caption is accounted for. Desktop (>900px) keeps
+     the exact previous tick set, hence a pixel-identical rendering. */
+  let picked = show;
+  if (innerWidth <= 900) {
+    const sample = step => {
+      if (step <= 1) return show;
+      const keep = new Set([0, show.length - 1]);
+      const cp = show.indexOf(cur);
+      if (cp >= 0) keep.add(cp);
+      for (let p = 0; p < show.length; p += step) keep.add(p);
+      return [...keep].sort((a, b) => a - b).map(p => show[p]);
+    };
+    /* Readability floor: space-between always stretches the row to the full
+       container, so scrollWidth alone never tells us the labels are comfortable.
+       Require both "no pixel overflow" and >=40px of track per year label. */
+    const comfortable = list => ticks.scrollWidth <= ticks.clientWidth + 3 &&
+      (list.length < 2 || ticks.clientWidth / (list.length - 1) >= 40);
+    for (let step = 1; step <= 8; step++) {
+      picked = sample(step);
+      paint(picked);
+      if (comfortable(picked)) break;
+    }
+    if (!comfortable(picked)) {
+      const keep = new Set([0, show.length - 1]);
+      const cp = show.indexOf(cur);
+      if (cp >= 0) keep.add(cp);
+      picked = [...keep].sort((a, b) => a - b).map(p => show[p]);
+      paint(picked);
+    }
+  } else {
+    paint(picked);
+  }
+  ticks.classList.toggle('scrollable', ticks.scrollWidth > ticks.clientWidth + 3);
+  /* One delegated handler for the whole row, selecting the tick whose CENTRE is
+     nearest the pointer. This is immune to any hit-area overlap: the previous
+     per-tick ±18px pseudo-elements made the next sibling swallow the previous
+     label's centre below ~1280px, so every mobile click jumped one year ahead. */
+  if (ticks.dataset.delegated !== '1') {
+    ticks.addEventListener('click', e => {
+      // track clicks (and clicks anywhere outside a label) keep the track's own
+      // fraction→quarter mapping; only a click that hit a tick is re-mapped
+      const hit = e.target.closest && e.target.closest('.tl-tick');
+      if (!hit) return;
+      // Programmatic .click() (tests, keyboard/AT activation) carries detail=0 and
+      // clientX=0; nearest-centre would always resolve to the first tick. Trust the
+      // element the caller actually activated in that case.
+      if (!e.detail) { setQuarter(Number(hit.dataset.i)); return; }
+      const list = [...ticks.querySelectorAll('.tl-tick')];
+      let best = null, bestD = Infinity;
+      for (const el of list) {
+        const r = el.getBoundingClientRect(), d = Math.abs(r.left + r.width / 2 - e.clientX);
+        if (d < bestD) { bestD = d; best = el; }
+      }
+      if (best) setQuarter(Number(best.dataset.i));
+    });
+    ticks.dataset.delegated = '1';
+  }
+  const pct = n > 1 ? (cur / (n - 1)) * 100 : 0;
+  document.getElementById('tlFill').style.width = pct + '%';
+  document.getElementById('tlThumb').style.left = pct + '%';
+  renderSnapDots(n);
+}
+/* one semi-transparent landing mark per quarter on the track; the nearest mark
+   to the pointer lights up while dragging, and release snaps to it */
+function renderSnapDots(n) {
+  const track = document.querySelector('.tl-track');
+  track.querySelectorAll('.tl-dot').forEach(d => d.remove());
+  for (let i = 0; i < n; i++) {
+    const d = document.createElement('div');
+    d.className = 'tl-dot'; d.dataset.i = i;
+    d.style.left = (n > 1 ? (i / (n - 1)) * 100 : 0) + '%';
+    track.appendChild(d);
+  }
+}
+function markNearDot(idx) {
+  const tl = document.getElementById('timeline');
+  tl.querySelectorAll('.tl-dot').forEach(d => d.classList.toggle('near', Number(d.dataset.i) === idx));
+}
+function initTimelineDrag() {
+  const thumb = document.getElementById('tlThumb');
+  const tl = document.getElementById('timeline');
+  let dragging = false;
+  const qIndexAt = e => {
+    const track = thumb.parentElement, r = track.getBoundingClientRect();
+    const frac = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    return Math.round(frac * (DATA.companies[state.company].quarters.length - 1));
+  };
+  thumb.addEventListener('pointerenter', () => { if (!dragging) tl.classList.add('hover'); });
+  thumb.addEventListener('pointerleave', () => { if (!dragging) tl.classList.remove('hover'); });
+  thumb.addEventListener('pointerdown', e => { dragging = true; tl.classList.add('dragging'); const i = qIndexAt(e); setQuarter(i); markNearDot(i); thumb.setPointerCapture(e.pointerId); e.preventDefault(); });
+  thumb.addEventListener('pointermove', e => {
+    if (!dragging) { tl.classList.add('hover'); return; }
+    const i = qIndexAt(e);
+    setQuarter(i);      // render() rebuilds the dots, so mark near AFTER it
+    markNearDot(i);
+  });
+  const endDrag = () => { dragging = false; tl.classList.remove('dragging', 'hover'); markNearDot(-1); };
+  thumb.addEventListener('pointerup', endDrag);
+  thumb.addEventListener('pointercancel', endDrag);
+  // whole track is clickable: pointerdown anywhere on it jumps to the nearest
+  // quarter at that fraction (round → midway points take the closer quarter).
+  // The thumb sits inside the track, so its own pointerdown bubbles here too —
+  // same computation, harmless duplicate setQuarter on the same index.
+  const track = thumb.parentElement;
+  track.addEventListener('pointerdown', e => {
+    const i = qIndexAt(e);
+    setQuarter(i);
+    markNearDot(i);
+    tl.classList.add('hover');
+    setTimeout(() => tl.classList.remove('hover'), 400);
+  });
+}
+
+/* ---- C1 honesty: per-company data source + real segment cutoff + derived-period badge ----
+   The source line used to hardcode "SEC EDGAR XBRL" for all 92 companies, which is false
+   for HK/CN/KR/CH/EU filers. Map by ticker suffix to their true disclosure venue. */
+function dataSourceLabel(tk) {
+  const sfx = (tk.match(/\.[A-Za-z]+$/) || [''])[0].toUpperCase();
+  if (sfx === '.HK') return lang === 'zh' ? '香港交易所披露易（HKEX）' : 'HKEX (HKEXnews)';
+  if (sfx === '.SS' || sfx === '.SZ' || sfx === '.SH') return lang === 'zh' ? '东方财富（Eastmoney）' : 'Eastmoney';
+  if (sfx === '.KS') return lang === 'zh' ? '公司年报（无免费结构化源）' : 'Company annual report (no free structured source)';
+  if (sfx === '.SW' || sfx === '.PA' || sfx === '.TW') return lang === 'zh' ? '公司年报' : 'Company annual report';
+  if (tk === 'HUAWEI' || tk === 'LEGO') return lang === 'zh' ? '公司年报' : 'Company annual report';
+  return 'SEC EDGAR XBRL';
+}
+function isSecSource(tk) {
+  const sfx = (tk.match(/\.[A-Za-z]+$/) || [''])[0];
+  return !sfx && tk !== 'HUAWEI' && tk !== 'LEGO';
+}
+/* latest period end that actually has a segment split (max key across quarters / annualQuarters) */
+function segCutoffEnd(tk) {
+  const s = SEG && SEG.companies && SEG.companies[tk];
+  if (!s) return null;
+  const ends = [];
+  if (s.quarters) ends.push(...Object.keys(s.quarters));
+  if (s.annualQuarters) ends.push(...Object.keys(s.annualQuarters));
+  if (!ends.length) return null;
+  return ends.sort()[ends.length - 1];
+}
+
+/* ---- segment-disclosure notes («口径备注») --------------------------------
+   Two curated sources carry the *disclosure-basis* commentary we want to show:
+     1) SEG.notes — a flat array of "TICKER: text" strings (shared bucket);
+     2) SEG.companies[ticker].notes — a per-company string / array / object.
+   SEG.failures is a 386-entry scrape-failure log (ticker/end/kind/reason/src);
+   it is NOT disclosure-basis commentary and must never be rendered.
+
+   Most top-level notes are noise: batch "N 季无分部披露" rows that only list
+   dates, and "warning — <date>: segment sum off revenue by X%" deviation alerts.
+   Showing those would bury the handful of real basis-change remarks, so we drop
+   them and keep only notes that speak to disclosure basis / derivation. */
+const SEG_NOTE_DROP_PATTERNS = [
+  /* batch rows: "33 季无分部披露（源上无分部表，非抓取失败）: 2010-01-31, ..." */
+  /\d+\s*季无分部披露（源上无分部表，非抓取失败）\s*[:：]/,
+  /* deviation alerts: "warning — 2014-12-31: segment sum off revenue by 1.23%" */
+  /warning\s*[—–-]\s*\d{4}-\d{2}-\d{2}:\s*segment sum off revenue by/i,
+  /* any remaining bare "N 季无分部披露" variant */
+  /\d+\s*季无分部披露/,
+];
+const SEG_NOTE_KEEP_HINTS = [
+  '口径变更', '披露口径', '口径', '按客群', '客群', 'CHBN', '推导', '抵销',
+  'elimination', '不可得', '无法获取', '仅年度', '仅半年', '汇率', '历史汇率',
+  '无法反推', '重分类',
+];
+function isUsefulSegNote(s) {
+  if (!s || typeof s !== 'string') return false;
+  for (const re of SEG_NOTE_DROP_PATTERNS) if (re.test(s)) return false;
+  const lower = s.toLowerCase();
+  return SEG_NOTE_KEEP_HINTS.some(k => s.includes(k) || lower.includes(k.toLowerCase()));
+}
+/* Normalise a notes container to a flat list of strings. segments.json has shipped
+   `notes` both as a flat array of "TICKER: text" rows and as an object keyed by
+   ticker (either `{ticker: "text"}`, `{ticker: ["text", ...]}` or a numeric-keyed
+   row bucket); per-company `notes` may likewise be a string / array / object. One
+   normaliser keeps every shape renderable instead of silently dropping the bucket. */
+function segNoteStrings(v) {
+  if (typeof v === 'string') return [v];
+  if (Array.isArray(v)) return v.flatMap(segNoteStrings);
+  if (v && typeof v === 'object') return Object.values(v).flatMap(segNoteStrings);
+  return [];
+}
+/* all top-level note rows that belong to `tk`, before the useful/noise filter.
+   - array (current data): "TICKER: text" rows, filtered by prefix;
+   - object keyed by ticker: take that ticker's entry only (values are already
+     scoped, so a bare "only 2 quarters..." text must NOT be dropped by the prefix test);
+   - object with numeric/row keys: treat the values as a row bucket.
+   `scoped` says whether the returned strings were already selected for this ticker. */
+function segNoteBucket(tk) {
+  const raw = SEG && SEG.notes;
+  if (!raw) return { rows: [], scoped: false };
+  if (typeof raw === 'string' || Array.isArray(raw)) return { rows: segNoteStrings(raw), scoped: false };
+  const key = Object.keys(raw).find(k => k.toUpperCase() === tk.toUpperCase());
+  if (key != null) return { rows: segNoteStrings(raw[key]), scoped: true };
+  return { rows: segNoteStrings(raw), scoped: false };
+}
+/* all display-worthy notes for one ticker, de-duped, in source order */
+function segNotesFor(tk) {
+  const out = [];
+  const push = s => { if (typeof s === 'string' && s.trim() && !out.includes(s.trim())) out.push(s.trim()); };
+  const re = /^([A-Za-z0-9.\-]+):\s*/;      // "TICKER: text"
+  const bucket = segNoteBucket(tk);
+  for (const n of bucket.rows) {
+    const m = n.match(re);
+    if (m) {
+      // a prefixed row belongs to its own ticker
+      if (m[1].toUpperCase() !== tk.toUpperCase()) continue;
+      const body = n.slice(m[0].length).trim();
+      if (isUsefulSegNote(body)) push(body);
+    } else if (bucket.scoped) {
+      // object form: the text is already ticker-scoped, keep the curated wording as-is
+      if (isUsefulSegNote(n)) push(n);
+    }
+    // bare rows in a flat "TICKER: text" bucket have no owner → skip (legacy behaviour)
+  }
+  const cn = SEG && SEG.companies && SEG.companies[tk] && SEG.companies[tk].notes;
+  segNoteStrings(cn).forEach(push);                   // per-company notes are curated: keep as-is
+  return out;
+}
+
+/* Keep #chartPanel's OUTER height constant across companies even though the notes
+   row makes .meta taller for the ~14 tickers that have notes. #logoRail is
+   `position:absolute; top:0; bottom:0`, so its height tracks #chartPanel exactly;
+   without compensation, switching from a noted company (taller meta) to AAPL
+   (no notes) would shrink the panel and make the whole rail jump — the exact
+   layout-shift that tests/verify_filter_jitter.mjs guards against. We absorb the
+   notes row's own height by shrinking the chart canvas by the same amount, so
+     panel = baseMeta + title + (SANKEE_BASE_H - notesH) + timeline = constant.
+   Both verify_layout_refactor (rail==panel) and verify_filter_jitter (rail stable
+   on company switch) depend on this invariant. */
+const SANKEE_BASE_H = 660; // must match #sankey's CSS height in index.html
+/* Phones get a shorter canvas so the timeline is reachable without a long
+   scroll; desktop keeps the exact 660px base that the layout-refactor tests
+   and the 1280px pixel regression depend on. */
+function sankeyBaseHeight() {
+  const w = window.innerWidth || 1280;
+  if (w <= 400) return 480;
+  if (w <= 768) return 520;
+  return SANKEE_BASE_H;
+}
+function syncChartHeightForNotes() {
+  const sk = document.getElementById('sankey');
+  if (!sk) return;
+  const noteEl = document.getElementById('segNotesLine');
+  let extra = 0;
+  if (noteEl) {
+    const cs = getComputedStyle(noteEl);
+    extra = noteEl.offsetHeight + (parseFloat(cs.marginTop) || 0);
+  }
+  sk.style.height = Math.max(240, sankeyBaseHeight() - extra) + 'px';
+}
+
+function render() {
+  const c = DATA.companies[state.company];
+  const qv = q();
+  document.getElementById('brand').textContent = t('appTitle');
+  // company/period meta + source + updated merged into one small top-right line
+  // (replaces the old h1 subtitle and the bottom footer/covLine rows)
+  {
+    const bits = [c.name, qv.end + (isAnnual() ? (lang === 'zh' ? ' 财年末' : ' (fiscal year end)') : (lang === 'zh' ? ' 季度末' : ' (quarter end)'))];
+    if (c.currency && c.currency !== 'USD-M') bits.push(c.currency.replace('-M', ''));
+    if (dispInUsd() && c.currency !== 'USD-M') bits.push('≈US$');
+    if (c.preview) bits.push(lang === 'zh' ? 'Preview（未上市，预览数据）' : 'Preview (private)');
+    // C1: real per-company source venue (never a blanket "SEC EDGAR XBRL" for HK/CN/KR/CH/EU)
+    const srcLabel = dataSourceLabel(state.company);
+    const srcHtml = isSecSource(state.company)
+      ? `<a href="${DATA.sourceUrl}" target="_blank">${srcLabel}</a>` : srcLabel;
+    // C1: real segment cutoff (max end in segments, else the latest income-statement period)
+    const latestProfitEnd = c.quarters.length ? c.quarters[c.quarters.length - 1].end : qv.end;
+    const segEnd = segCutoffEnd(state.company);
+    const cutoff = segEnd || latestProfitEnd;
+    const stale = segEnd && (new Date(latestProfitEnd) - new Date(segEnd)) / 864e5 > 200;
+    const cutoffTag = segEnd
+      ? (lang === 'zh' ? '分部截至' : 'segments as of')
+      : (lang === 'zh' ? '利润表截至' : 'income stmt as of');
+    const staleTag = stale ? (lang === 'zh' ? ' ⚠ 分部数据陈旧' : ' ⚠ segment data stale') : '';
+    // C1: derived / estimated CURRENT period (differenced CN rows, or HK-mixed single quarters)
+    const hkDerived = (c.frequency === 'hk-mixed') && /^q[1-4]$/.test(qv.periodType || '');
+    const estTag = (qv.derivation === 'diff' || hkDerived)
+      ? `<span class="estBadge">${lang === 'zh' ? '推算' : 'derived'}</span>` : '';
+    // one extra small-gray row under the two meta lines: disclosure-basis notes for
+    // the CURRENT company only. Clamped to 2 lines via CSS; full text in `title`.
+    const notes = segNotesFor(state.company);
+    let notesHtml = '';
+    if (notes.length) {
+      const escAttr = s => String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+      const full = notes.join(lang === 'zh' ? '；' : '; ');
+      notesHtml = `<div class="segNote" id="segNotesLine" title="${escAttr(full)}">${escAttr(t('segNotes'))}${lang === 'zh' ? '：' : ': '}${escAttr(full)}</div>`;
+    }
+    document.getElementById('metaLine').innerHTML =
+      `${bits.join(' · ')}${estTag}<br/>${t('updated')} ${DATA.updated} · ${t('source')} ${srcHtml} · ${cutoffTag} ${cutoff}${staleTag}${notesHtml}`;
+  }
+  document.getElementById('btnExportPNG').querySelector('span').textContent = t('exportPNG');
+  document.getElementById('btnExportSVG').querySelector('span').textContent = t('exportSVG');
+  document.getElementById('btnLang').textContent = t('langBtn');
+
+  // currency toggle: only CNY-reporting companies get a ¥/US$ switch
+  const btnCur = document.getElementById('btnCur');
+  btnCur.style.display = canToggleCur() ? '' : 'none';
+  if (canToggleCur()) {
+    btnCur.textContent = dispInUsd() ? (lang === 'zh' ? '显示 ¥' : 'Show ¥') : (lang === 'zh' ? '显示 US$' : 'Show US$');
+    btnCur.classList.toggle('active', dispInUsd());
+  }
+
+  // label-mode buttons: text + active state (stackable pct/qoq; annual series → 同比/YoY)
+  document.getElementById('lblPct').textContent = t('pctBtn');
+  document.getElementById('lblQoQ').textContent = isAnnual() ? (lang === 'zh' ? '同比' : 'YoY') : t('qoqBtn');
+  document.getElementById('btnPct').classList.toggle('active', state.view === 'bar' ? barLines.pct : state.mode.pct);
+  document.getElementById('btnQoQ').classList.toggle('active', state.view === 'bar' ? barLines.qoq : state.mode.qoq);
+
+  // view switcher: bridge (sankey + timeline) vs bar (full-history time series)
+  document.getElementById('lblViewBridge').textContent = t('viewBridge');
+  document.getElementById('lblViewBar').textContent = t('viewBar');
+  document.getElementById('btnViewBridge').classList.toggle('active', state.view === 'bridge');
+  document.getElementById('btnViewBar').classList.toggle('active', state.view === 'bar');
+  // visibility (not display) — the timeline slot keeps its height in bar view so
+  // #chartPanel's outer box never changes when switching views
+  document.getElementById('timeline').style.visibility = state.view === 'bar' ? 'hidden' : '';
+  // bridge view has no bar chart → make sure the cumulative-bar note never lingers
+  if (state.view !== 'bar') { const bn = document.getElementById('barBasisNote'); if (bn) bn.classList.remove('show'); }
+  renderBarSelect(); // must run before renderChart — it fixes state.barItem for the new company
+
+  renderIndustryBar();
+  renderLogoRail();
+  renderTimeline();
+  syncChartHeightForNotes(); // resize canvas to keep panel height constant (see helper)
+  renderChart();
+  if (chart) chart.resize(); // re-fit ECharts after the canvas height change (post-setOption is safe)
+
+  document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+  syncHash(); // keep the shareable view-state hash in step with every render
+}
+
+/* B1: the exported image is rendered from the ECharts option only, while the on-screen
+   title / company / period live in HTML (#chartTitle/#metaLine). Build a header block from
+   the CURRENT state and paint it into the export so the PNG/SVG carries the same title,
+   company, view and period the user sees — plus a small provenance watermark. */
+function exportHeaderData() {
+  const c = DATA.companies[state.company];
+  const qv = q();
+  const title = (document.getElementById('chartTitle').textContent || '').trim();
+  const view = state.view === 'bar' ? t('viewBar') : t('viewBridge');
+  const period = state.view === 'bar'
+    ? (lang === 'zh' ? `全历史至 ${qv.end}` : `full history to ${qv.end}`)
+    : quarterLabel(qv.end, qv.periodType);
+  // Amounts are printed adaptively (≥1B one decimal, <1B in millions — see amtText),
+  // so a fixed "十亿 (B)" caption contradicts M labels in the same export. State the
+  // adaptive rule instead of naming one unit; the currency symbol is still shown.
+  const unit = lang === 'zh' ? `单位 ${dispSym()}B/M（随数值自适应）` : `unit ${dispSym()}B/M (adaptive)`;
+  const cur = (c.currency && c.currency !== 'USD-M')
+    ? (dispInUsd() ? '≈US$ · ' : c.currency.replace('-M', '') + ' · ') : '';
+  return { title, line: `${c.name} (${state.company}) · ${period} · ${view} · ${cur}${unit}` };
+}
+/* Build the ECharts option used for BOTH exports. Two guarantees the on-screen
+   chart can't give us for free:
+   - the dataZoom SLIDER (the strip near the bottom that looks like a timeline) must not be
+     baked into the exported image/SVG — the export should be title + chart + watermark only;
+     we keep the user's zoom window by re-expressing it as an invisible `inside` zoom.
+   - no tooltip / animation in a static export. */
+function exportOption() {
+  const live = chart ? chart.getOption() : {};
+  const base = Object.assign({}, window.__lastOption || live,
+    { backgroundColor: '#f2efe9', animation: false, tooltip: undefined });
+  const dz = (live.dataZoom || [])[0] || {};
+  const start = dz.start != null ? dz.start : 0;
+  const end = dz.end != null ? dz.end : 100;
+  if (Array.isArray(base.dataZoom) && base.dataZoom.length) {
+    base.dataZoom = [{ type: 'inside', xAxisIndex: 0, start, end }]; // drop the slider UI, keep the window
+  }
+  return base;
+}
+function exportWatermark() {
+  return `profitbridge · ${lang === 'zh' ? '数据更新' : 'data updated'} ${DATA.updated} · ${lang === 'zh' ? '单位' : 'unit'} ${dispSym()}${lang === 'zh' ? 'B/M（自适应）' : 'B/M (adaptive)'}`;
+}
+function exportFileName(ext) {
+  return `${state.view === 'bar' ? 'bar_' + state.barItem.replace(/^seg:/, 'seg_') : 'profit_bridge'}_${state.company}_${q().end}.${ext}`;
+}
+const _svgEsc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function svgWithHeader(rawSvg) {
+  const h = exportHeaderData(), wm = exportWatermark();
+  const openM = rawSvg.match(/^<svg[^>]*>/i);
+  const openTag = openM ? openM[0] : '<svg>';
+  const width = (openTag.match(/width="([\d.]+)"/i) || [])[1] || '1200';
+  const height = (openTag.match(/height="([\d.]+)"/i) || [])[1] || '900';
+  const inner = rawSvg.replace(/^<svg[^>]*>/i, '').replace(/<\/svg>\s*$/i, '');
+  const headH = 96, wmH = 40;
+  const W = Number(width), H = Number(height) + headH + wmH;
+  const fam = "'Segoe UI','Microsoft YaHei',sans-serif";
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+<rect x="0" y="0" width="${W}" height="${H}" fill="#f2efe9"/>
+<text x="${W / 2}" y="40" text-anchor="middle" font-family="${fam}" font-size="30" font-weight="800" fill="#1d55a5">${_svgEsc(h.title)}</text>
+<text x="${W / 2}" y="72" text-anchor="middle" font-family="${fam}" font-size="15" fill="#475569">${_svgEsc(h.line)}</text>
+<g transform="translate(0,${headH})">${inner}</g>
+<text x="${W / 2}" y="${H - 14}" text-anchor="middle" font-family="${fam}" font-size="11" fill="#52607a">${_svgEsc(wm)}</text>
+</svg>`;
+}
+async function exportPNG() {
+  if (!chart) return;
+  const h = exportHeaderData(), wm = exportWatermark();
+  const W = 1600, H = 900, headH = 96, wmH = 40, ratio = 2;
+  // SVG renderer can't rasterize → re-render into an offscreen CANVAS echarts instance at
+  // 2x, then compose it under a header band drawn with the 2D context (title + meta + wm).
+  const opt = exportOption();
+  const off = echarts.init(document.createElement('div'), null, { renderer: 'canvas', width: W, height: H });
+  off.setOption(opt);
+  const chartUrl = off.getDataURL({ type: 'png', pixelRatio: ratio, backgroundColor: '#f2efe9' });
+  off.dispose();
+  const img = new Image();
+  await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = chartUrl; });
+  const canvas = document.createElement('canvas');
+  canvas.width = W * ratio; canvas.height = (H + headH + wmH) * ratio;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#f2efe9'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, headH * ratio, W * ratio, H * ratio);
+  const fam = "'Segoe UI','Microsoft YaHei',sans-serif";
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#1d55a5'; ctx.font = `800 ${30 * ratio}px ${fam}`;
+  ctx.fillText(h.title, canvas.width / 2, 40 * ratio);
+  ctx.fillStyle = '#475569'; ctx.font = `${15 * ratio}px ${fam}`;
+  ctx.fillText(h.line, canvas.width / 2, 74 * ratio);
+  ctx.fillStyle = '#52607a'; ctx.font = `${11 * ratio}px ${fam}`;
+  ctx.fillText(wm, canvas.width / 2, (H + headH + wmH / 2) * ratio);
+  const dataUrl = canvas.toDataURL('image/png');
+  const a = document.createElement('a');
+  a.download = exportFileName('png');
+  a.href = dataUrl;
+  document.body.appendChild(a); a.click(); a.remove();
+  return dataUrl; // tests (verify_export) read this to prove the composed image is non-empty
+}
+function exportSVG() {
+  if (!chart) return;
+  // Render from the export option (no dataZoom slider / timeline strip) into an offscreen
+  // SVG instance, then wrap with the same header + watermark the PNG carries.
+  const off = echarts.init(document.createElement('div'), null, { renderer: 'svg', width: 1600, height: 900 });
+  off.setOption(exportOption());
+  const raw = off.renderToSVGString();
+  off.dispose();
+  const svg = svgWithHeader(raw);
+  const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.download = exportFileName('svg');
+  a.href = url; document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  return svg; // tests read this to assert company/period text is present in the export
+}
+
+function initControls() {
+  initTimelineDrag();
+  document.getElementById('btnLang').addEventListener('click', () => { lang = lang === 'en' ? 'zh' : 'en'; render(); });
+  document.getElementById('btnExportPNG').addEventListener('click', exportPNG);
+  document.getElementById('btnExportSVG').addEventListener('click', exportSVG);
+  document.getElementById('btnPct').addEventListener('click', () => {
+    if (state.view === 'bar') { barLines.pct = !barLines.pct; render(); } // bar view: toggle 占比 line
+    else { state.mode.pct = !state.mode.pct; render(); }
+  });
+  document.getElementById('btnQoQ').addEventListener('click', () => {
+    if (state.view === 'bar') { barLines.qoq = !barLines.qoq; render(); } // bar view: toggle 环比 line
+    else { state.mode.qoq = !state.mode.qoq; render(); }
+  });
+  document.getElementById('btnViewBridge').addEventListener('click', () => { if (state.view !== 'bridge') { state.view = 'bridge'; render(); } });
+  document.getElementById('btnViewBar').addEventListener('click', () => { if (state.view !== 'bar') { state.view = 'bar'; render(); } });
+  document.getElementById('btnCur').addEventListener('click', () => {
+    if (!canToggleCur()) return;
+    state.curMode = dispInUsd() ? 'native' : 'usd';
+    render();
+  });
+}
+
+(async function main() {
+  // prefer fetch (http); fall back to inlined payload (file:// double-click)
+  let loaded = null;
+  try {
+    const res = await fetch('data/profit.json');
+    if (res.ok) loaded = await res.json();
+  } catch (e) { /* file:// or offline */ }
+  if (!loaded) {
+    // D1: index.html no longer eagerly loads the 566KB data/profit.json.js (the JSON fetch
+    // above is the normal path). When that fetch fails — file:// double-click or offline —
+    // inject the inline payload on demand. This is the ONLY reason the .json.js file exists,
+    // so file:// keeps working without every HTTP visitor paying for the 566KB up front.
+    if (!window.__PROFIT_DATA) {
+      await new Promise(resolve => {
+        const s = document.createElement('script');
+        s.src = 'data/profit.json.js';
+        s.onload = resolve; s.onerror = resolve; // resolve either way; missing data handled below
+        document.head.appendChild(s);
+      });
+    }
+    if (window.__PROFIT_DATA) loaded = window.__PROFIT_DATA;
+  }
+  if (!loaded) { document.getElementById('brand').textContent = lang === 'zh' ? '未找到数据文件 data/profit.json' : 'data/profit.json not found'; return; }
+  DATA = loaded;
+  // profitPreview (e.g. SPCX): injected as a NORMAL entry so the rail/bridge can
+  // render it alongside the main series — no Preview special-casing in the UI
+  // (data agent will move it into the main sequence; until then nothing breaks).
+  if (DATA.profitPreview && !DATA.companies[DATA.profitPreview.ticker]) {
+    const pv = DATA.profitPreview;
+    DATA.companies[pv.ticker] = {
+      name: pv.name, currency: pv.currency || 'USD-M', frequency: pv.frequency || 'q',
+      quarters: pv.quarters,
+    };
+  }
+  try {
+    const res = await fetch('data/segments.json');
+    if (res.ok) SEG = await res.json();
+  } catch (e) { /* segments optional — waterfall only */ }
+  if (!SEG) {
+    // Same on-demand pattern as data/profit.json.js above: the fetch is the normal path, so
+    // HTTP visitors never pay for the 340KB mirror. Only file:// double-click / offline lands
+    // here. Failure is non-fatal: SEG stays null and the views degrade to "no segments".
+    if (!window.__SEGMENT_DATA) {
+      await new Promise(resolve => {
+        const s = document.createElement('script');
+        s.src = 'data/segments.json.js';
+        s.onload = resolve; s.onerror = resolve; // resolve either way; missing data handled below
+        document.head.appendChild(s);
+      });
+    }
+    if (window.__SEGMENT_DATA) SEG = window.__SEGMENT_DATA;
+  }
+  try {
+    const res = await fetch('data/companies.json');
+    if (res.ok) REGISTRY = await res.json();
+  } catch (e) { /* registry optional — built-in fallbacks cover the 10 dashboard companies */ }
+
+  chart = echarts.init(document.getElementById('sankey'), null, { renderer: 'svg' });
+  chart.on('datazoom', () => { // remember the user's time window (also synced to hash)
+    const dz = (chart.getOption().dataZoom || [])[0];
+    if (dz && dz.start != null && dz.end != null) {
+      window.__barZoom = { start: dz.start, end: dz.end };
+      syncHash();
+    }
+  });
+  applyHash(); // deep-link: #c=&q=&v=&m=&z=&ind= (legacy #ind= still accepted)
+  // on resize the notes row may re-wrap (1↔2 lines): recompute the canvas height
+  // (the helper also calls chart.resize()) so the panel/rail stay aligned.
+  window.addEventListener('resize', () => { syncChartHeightForNotes(); renderChart(); if (chart) chart.resize(); });
+  initControls();
+  render();
+})();
