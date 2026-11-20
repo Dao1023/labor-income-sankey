@@ -145,15 +145,13 @@
 
     /* 细节说明 */
     nodes.forEach(function (n) {
-      detail[n.id] = {
-        title: n.label, value: n.value, color: n.color,
-        rows: [
-          ['占本列合计', pct(n.value / (nodes.filter(function (m) { return m.layer === n.layer; })
-            .reduce(function (a, m) { return a + m.value; }, 0) || 1), 1)],
-          ['占税前应发', pct(n.value / (r.gross || 1), 1)]
-        ],
-        note: n.note || ''
-      };
+      var rows = [
+        ['占本列合计', pct(n.value / (nodes.filter(function (m) { return m.layer === n.layer; })
+          .reduce(function (a, m) { return a + m.value; }, 0) || 1), 1)],
+        ['占税前应发', pct(n.value / (r.gross || 1), 1)]
+      ];
+      if (hasRevenueCut) rows.push(['占订单流水', pct(n.value / (r.revenue || 1), 1)]);
+      detail[n.id] = { title: n.label, value: n.value, color: n.color, rows: rows, note: n.note || '' };
     });
 
     return { nodes: nodes, links: links, detail: detail };
