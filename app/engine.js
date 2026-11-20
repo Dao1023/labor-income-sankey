@@ -129,9 +129,13 @@
     /* ---------- 个税 ---------- */
     var taxType = (c.tax && c.tax.type) || 'wage';
     var withheld = 0, finalTax = 0, taxEquity = 0, taxBonus = 0, refundable = 0;
+    /* 对外导出的税基口径（月额）：taxBase 是当前 case 实际走的税基，
+       taxBaseFinal 是汇算口径（只有劳务报酬两者不同），taxRate 是命中的档位费率。 */
+    var taxBase = 0, taxBaseFinal = 0, taxRate = 0, taxBaseKind = 'none';
 
     if (taxType === 'none') {
       withheld = finalTax = 0;
+      taxBaseKind = 'none';
     } else if (taxType === 'service') {
       if (gross <= 4000) withheld = Math.max(0, gross - 800) * 0.20 * 12;
       else withheld = taxOf(SERVICE_TABLE, gross * 0.8) * 12;
@@ -139,20 +143,33 @@
         - (personalSi + pHf + pAnnuity) * 12 - deductionsMonthly * 12);
       finalTax = taxOf(WAGE_TABLE, svcTaxable);
       refundable = Math.max(0, withheld - finalTax);
+      taxBase = gross * 0.8;                       // 预扣口径：月度收入 × 80%
+      taxBaseFinal = svcTaxable / 12;              // 汇算口径：并入综合所得后的月税基
+      taxRate = taxBase > 0 ? (withheld / 12) / taxBase : 0;
+      taxBaseKind = 'service';
     } else if (taxType === 'intern') {
-      withheld = taxOf(WAGE_TABLE, Math.max(0, annual - 60000 - deductionsMonthly * 12));
+      var internTaxable = Math.max(0, annual - 60000 - deductionsMonthly * 12);
+      withheld = taxOf(WAGE_TABLE, internTaxable);
       finalTax = withheld;
+      taxBase = taxBaseFinal = internTaxable / 12;
+      taxRate = bracket(WAGE_TABLE, internTaxable).rate;
+      taxBaseKind = 'comprehensive';
     } else if (taxType === 'business') {
       if (c.tax.mode === 'deemed') {
         withheld = annual * (c.tax.deemedRate || 0.015);
+        taxBase = taxBaseFinal = annual / 12;
+        taxRate = c.tax.deemedRate || 0.015;
       } else {
         var bizTaxable = Math.max(0, annual - 60000
           - (personalSi + pHf + pAnnuity) * 12 - deductionsMonthly * 12);
         var bt = taxOf(BIZ_TABLE, bizTaxable);
         if (c.tax.half && bizTaxable <= 2000000) bt *= 0.5;
         withheld = bt;
+        taxBase = taxBaseFinal = bizTaxable / 12;
+        taxRate = bracket(BIZ_TABLE, bizTaxable).rate;
       }
       finalTax = withheld;
+      taxBaseKind = 'business';
     } else {
       var comprehensive = annual - equityAnnual - (bonusMethod === 'separate' ? bonusAnnual : 0);
       var taxable = Math.max(0, comprehensive - 60000
@@ -165,6 +182,9 @@
       taxEquity = taxOf(WAGE_TABLE, equityAnnual);
       withheld = taxWage + taxBonus + taxEquity;
       finalTax = withheld;
+      taxBase = taxBaseFinal = taxable / 12;
+      taxRate = bracket(WAGE_TABLE, taxable).rate;
+      taxBaseKind = 'comprehensive';
     }
 
     /* ---------- 闭合与统计 ---------- */
@@ -199,6 +219,7 @@
       hfMonthly: hfMonthly, annuityMonthly: annuityMonthly,
       tax: { withheld: withheldMonthly, annual: withheld, final: finalTax, finalMonthly: finalTax / 12,
              refundable: refundable, equity: taxEquity, bonus: taxBonus, kind: taxType },
+      taxBase: taxBase, taxBaseFinal: taxBaseFinal, taxRate: taxRate, taxBaseKind: taxBaseKind,
       net: net, cost: cost, topLine: topLine,
       stats: stats
     };
