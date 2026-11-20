@@ -79,6 +79,75 @@
     };
   }
 
+  /* 费率 / 税基 / 公式带 —— 数字全部来自引擎结果，阈值全部来自 LaborEngine.tables */
+  function pct1(v) { return (v * 100).toFixed(1).replace(/\.0$/, '') + '%'; }
+  function bracketOf(t, x) {
+    if (!t || !t.length) return null;
+    for (var i = 0; i < t.length; i++) if (x <= t[i].cap) return t[i];
+    return t[t.length - 1];
+  }
+
+  function formulaCtx(c, r) {
+    var P = r.p;
+    var siBase = r.siBase || 0;
+    var siRate = siBase > 0 ? (P.pension + P.medical + P.unemp) / siBase : 0;
+    var annRate = ((c.si && c.si.annuity && c.si.annuity.p) || 0) / 100;
+    var T = E.tables || {};
+    var t = null;
+    if (r.taxBaseKind === 'comprehensive') t = bracketOf(T.WAGE_TABLE || [], (r.taxBase || 0) * 12);
+    else if (r.taxBaseKind === 'business') t = bracketOf(T.BIZ_TABLE || [], (r.taxBase || 0) * 12);
+    return { siRate: siRate, hfRate: r.hfRate, annRate: annRate, quickMonth: t ? (t.quick || 0) / 12 : 0 };
+  }
+
+  function formulaOf(c, r) {
+    var ctx = formulaCtx(c, r);
+    var kind = r.taxBaseKind || 'none';
+    var ded = r.deductionsMonthly || 0;
+    var P = r.p, ER = r.er || {};
+    var gross = r.gross, taxM = P.tax || 0;
+    if (kind === 'none') return '个税：未申报（无扣缴）';
+
+    if (kind === 'service') {
+      var base = r.taxBase || 0, finBase = r.taxBaseFinal || 0;
+      var finM = (r.tax.final || 0) / 12;
+      var eff = finBase > 0 ? finM / finBase : 0;
+      return '应发 ' + money(gross) + ' × 80% = ' + money(base) + '（并入综合所得）· 预扣 ' + money(taxM) + '/月'
+        + '；年度汇算：税基 ' + money(finBase) + ' × ' + pct1(eff) + ' = ' + money(finM) + '/月'
+        + (r.tax.refundable > 0.5 ? '，可退 ' + money(r.tax.refundable) : '');
+    }
+
+    if (kind === 'business') {
+      if (c.tax && c.tax.mode === 'deemed') {
+        return '年应发 ' + money(r.annual) + ' × 核定率 ' + pct1(r.taxRate || 0) + ' = 年税 ' + money(r.tax.annual || 0);
+      }
+      var bizDeduct = (P.si + P.hf + P.annuity) * 12;
+      var seg = ['年应发 ' + money(r.annual), '起征点 ' + money(60000)];
+      if (bizDeduct > 0.5) seg.push('社保公积金年金 ' + money(bizDeduct));
+      if (ded > 0.5) seg.push('专扣 ' + money(ded * 12));
+      var bBase = r.taxBase || 0;
+      if (bBase <= 0) return seg.join(' − ') + ' = 未达起征点';
+      return seg.join(' − ') + ' = 税基 ' + money(bBase * 12) + ' × ' + pct1(r.taxRate || 0)
+        + (ctx.quickMonth > 0.5 ? ' − 速算 ' + money(ctx.quickMonth * 12) : '')
+        + ' = 年税 ' + money(r.tax.annual || 0);
+    }
+
+    /* comprehensive：工资薪金 / 实习劳务 */
+    var parts = ['应发 ' + money(gross)];
+    if (c.tax && c.tax.type !== 'intern') {
+      if (P.si > 0.5) parts.push('社保 ' + money(P.si) + '（基 ' + money(r.siBase) + ' × ' + pct1(ctx.siRate) + '）');
+      if (P.hf > 0.5) parts.push('公积金 ' + money(P.hf) + '（基 ' + money(r.hfBase) + ' × ' + pct1(ctx.hfRate) + '）');
+      if (P.annuity > 0.5) parts.push('年金 ' + money(P.annuity) + '（基 ' + money(gross) + ' × ' + pct1(ctx.annRate) + '）');
+    }
+    parts.push('起征点 ' + money(5000));
+    if (ded > 0.5) parts.push('专扣 ' + money(ded));
+    var head = parts.join(' − ');
+    var baseM = r.taxBase || 0;
+    if (baseM <= 0) return head + ' = 未达起征点';
+    return head + ' = 税基 ' + money(baseM) + ' × ' + pct1(r.taxRate || 0)
+      + (ctx.quickMonth > 0.5 ? ' − 速算 ' + money(ctx.quickMonth) : '')
+      + ' = 个税 ' + money(taxM);
+  }
+
   /* ---------- 主构建 ---------- */
   function build(c, r, employerView) {
     var nodes = [];
@@ -142,24 +211,55 @@
         : ((c.tax && c.tax.type === 'business') ? '运营成本' : '其他扣减');
       var cutDest = r.agPay === 'worker' ? '平台 / 中介'
         : ((c.tax && c.tax.type === 'business') ? '运营成本' : '其他扣减');
-      fill('cut', cutLabel, cut, 1, PAL.agency, 'top');
+      fill('cut', cutLabel, cut, 2, PAL.agency, 'top');
       flow('cut', 't:agency', cut, PAL.agency);
-      sink('t:agency', cutDest, PAL.agency, cut, 2);
+      sink('t:agency', cutDest, PAL.agency, cut, 3);
     }
 
-    /* ---------- 第 3 列：个人扣缴（六项分列） ---------- */
+    /* ---------- 第 3 列：个人扣缴（社保个人 / 公积金 / 年金 / 个税） ----------
+       「基数 × 费率」是引擎内部的一层，做成节点会破坏流量守恒，所以只放在
+       节点名（费率）、tooltip 与图上方公式带（基数 / 税基）三处。 */
     var P = r.p;
+    var siBase = r.siBase, hfBase = r.hfBase;
+    var siRate = siBase > 0 ? (P.pension + P.medical + P.unemp) / siBase : 0;
+    var hfRate = r.hfRate;
+    var annRate = ((c.si && c.si.annuity && c.si.annuity.p) || 0) / 100;
+    var taxBase = r.taxBase || 0, taxRate = r.taxRate || 0;
+    var T = E.tables || {};
+    var tb = null;
+    if (r.taxBaseKind === 'comprehensive') tb = bracketOf(T.WAGE_TABLE || [], taxBase * 12);
+    else if (r.taxBaseKind === 'business') tb = bracketOf(T.BIZ_TABLE || [], taxBase * 12);
+    var quickMonth = tb ? (tb.quick || 0) / 12 : 0;
+
     var items = [
-      { id: 'd:pension', label: '养老', v: P.pension, dests: [['t:pacct', '养老个人账户', PAL.acct, P.pensionAcct], ['t:ppool', '养老统筹', PAL.pool, P.pensionPool]] },
-      { id: 'd:medical', label: '医疗', v: P.medical, dests: [['t:med', '医保统筹', PAL.pool, P.medical]] },
-      { id: 'd:unemp', label: '失业', v: P.unemp, dests: [['t:unemp', '失业统筹', PAL.pool, P.unemp]] },
-      { id: 'd:hf', label: '公积金', v: P.hf, dests: [['t:hf', '公积金账户', PAL.fund, P.hf]] },
-      { id: 'd:annuity', label: '年金', v: P.annuity, dests: [['t:ann', '年金账户', PAL.fund, P.annuity]] },
-      { id: 'd:tax', label: '个税', v: P.tax, dests: [['t:tax', '国库 · 个税', PAL.tax, P.tax]] }
+      {
+        id: 'd:si', label: '社保个人 ' + pct1(siRate), v: P.pension + P.medical + P.unemp,
+        base: '基数 ' + money(siBase) + ' × ' + pct1(siRate),
+        dests: [['t:pacct', '养老个人账户', PAL.acct, P.pensionAcct],
+                ['t:ppool', '养老统筹', PAL.pool, P.pensionPool],
+                ['t:med', '医疗个人账户', PAL.acct, P.medical],
+                ['t:unemp', '失业统筹', PAL.pool, P.unemp]]
+      },
+      {
+        id: 'd:hf', label: '公积金 ' + pct1(hfRate), v: P.hf,
+        base: '基数 ' + money(hfBase) + ' × ' + pct1(hfRate),
+        dests: [['t:hf', '公积金账户', PAL.fund, P.hf]]
+      },
+      {
+        id: 'd:ann', label: '年金 ' + pct1(annRate), v: P.annuity,
+        base: '基数 ' + money(G) + ' × ' + pct1(annRate),
+        dests: [['t:ann', '年金账户', PAL.fund, P.annuity]]
+      },
+      {
+        id: 'd:tax', label: '个税', v: P.tax,
+        base: '税基 ' + money(taxBase) + ' × ' + pct1(taxRate) + (quickMonth > 0.5 ? ' − 速算 ' + money(quickMonth) : ''),
+        dests: [['t:tax', '国库', PAL.tax, P.tax]]
+      }
     ];
     items.forEach(function (it) {
       var id = fill(it.id, it.label, it.v, 2, PAL.deduct, 'right');
       if (!id) return;
+      nodes[nodes.length - 1].baseNote = it.base;
       flow('gross', id, it.v, PAL.deduct);
       it.dests.forEach(function (d) {
         if (!(d[3] > 0.004)) return;
@@ -168,11 +268,11 @@
       });
     });
 
-    /* 到手现金：应发的剩余部分。ECharts 的层级由连边推导（1→2），所以它与扣缴六项
-       同列；去向列放的是各项扣缴真正落进去的账户。 */
-    fill('t:net', '到手现金', r.net, 2, PAL.net, 'right');
+    /* 到手现金：应发的剩余部分。ECharts 5 的 sankey 支持 data[].depth 显式分层
+       （已实测），所以这里直接给 3，让它与各项扣缴的落点同在「去向」列。 */
+    fill('t:net', '到手现金', r.net, 3, PAL.net, 'right');
     flow('gross', 't:net', r.net, PAL.net);
-    sink('t:net', '到手现金', PAL.net, r.net, 2);
+    sink('t:net', '到手现金', PAL.net, r.net, 3);
 
     /* ---------- 单位成本支干（只在单位成本视角出现） ---------- */
     var ER = r.er;
@@ -184,7 +284,7 @@
 
       var parts = [
         ['u:pension', '单位养老', ER.pension, 't:ppool', '养老统筹', PAL.pool],
-        ['u:medical', '单位医疗', ER.medical, 't:med', '医保统筹', PAL.pool],
+        ['u:medical', '单位医疗', ER.medical, 't:medpool', '医疗统筹', PAL.pool],
         ['u:unemp', '单位失业', ER.unemp, 't:unemp', '失业统筹', PAL.pool],
         ['u:injury', '单位工伤', ER.injury, 't:injury', '工伤统筹', PAL.pool],
         ['u:hf', '单位公积金', ER.hf, 't:hf', '公积金账户', PAL.fund],
@@ -201,8 +301,8 @@
       });
     }
 
-    /* ---------- 去向列（统一排序：到手 → 账户 → 税 → 统筹 → 平台） ---------- */
-    var ORDER = ['t:net', 't:hf', 't:pacct', 't:ann', 't:tax', 't:med', 't:unemp', 't:ppool', 't:injury', 't:agency'];
+    /* ---------- 去向列（钱归谁：到手 → 账户 → 统筹 → 国库 → 平台） ---------- */
+    var ORDER = ['t:net', 't:hf', 't:pacct', 't:med', 't:ann', 't:ppool', 't:medpool', 't:unemp', 't:injury', 't:tax', 't:agency'];
     destOrder.sort(function (a, b) {
       var ia = ORDER.indexOf(a), ib = ORDER.indexOf(b);
       return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
@@ -220,7 +320,7 @@
     });
 
     /* ---------- 列内顺序：单位成本支干置顶，其次收入构成；扣缴 / 去向按固定次序 ---------- */
-    var DORDER = ['d:pension', 'd:medical', 'd:unemp', 'd:hf', 'd:annuity', 'd:tax'];
+    var DORDER = ['d:si', 'd:hf', 'd:ann', 'd:tax'];
     var UORDER = ['u:pension', 'u:medical', 'u:unemp', 'u:injury', 'u:hf', 'u:annuity', 'u:agency'];
     function rankOf(n) {
       if (n.name === 'u:extra') return 0;
@@ -240,6 +340,7 @@
       nodes: nodes,
       links: links,
       meta: meta,
+      formula: formulaOf(c, r),
       title: c.name,
       subtitle: meta.city + ' · ' + meta.legal + ' · 税目 ' + meta.tax,
       pctBase: pctBase,
@@ -258,6 +359,9 @@
     short: function (c) { return SHORT[c.id] || c.name.slice(0, 3); },
     tint: function (c) { return GROUP_TINT[c.group] || PAL.unit; },
     meta: function () { return D.meta; },
+    metaOf: metaOf,
+    formulaOf: formulaOf,
+    formulaCtx: formulaCtx,
     build: build,
     money: money,
     fmtPct: fmtPct,
