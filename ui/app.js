@@ -12,6 +12,7 @@
   var chart = null;
   var byId = {};
   var lastGraph = null;
+  var lastSig = '';
   var pctMode = false;
   try { pctMode = localStorage.getItem('labor.pct') === '1'; } catch (e) {}
   var PAD = { left: 152, right: 176, top: 46, bottom: 26 };
@@ -74,48 +75,106 @@
     };
   }
 
-  function renderTimeline() {
+  var tickCaseId = null;
+  var dragActive = false;
+
+  function buildTicks() {
+    var c = current(), rg = rangeOf(c);
+    tickCaseId = c.id;
+    q('#tlTicks').innerHTML =
+      '<div class="tl-tick" data-v="' + rg.min + '"><div class="q">' + money(rg.min) + '</div><div class="d">下限</div></div>' +
+      '<div class="tl-tick mid active"><div class="q"></div><div class="d">当前</div></div>' +
+      '<div class="tl-tick" data-v="' + rg.max + '" style="margin-left:auto"><div class="q">' + money(rg.max) + '</div><div class="d">上限</div></div>';
+  }
+
+  function paintSlider() {
     var c = current(), rg = rangeOf(c), v = clamp(state.gross, rg.min, rg.max);
     var p = (v - rg.min) / (rg.max - rg.min) * 100;
     q('#tlFill').style.width = p + '%';
     q('#tlThumb').style.left = p + '%';
     q('#tlNow').textContent = money(v);
-    var cp = Math.max(9, Math.min(91, p));
-    q('#tlTicks').innerHTML =
-      '<div class="tl-tick" data-v="' + rg.min + '"><div class="q">' + money(rg.min) + '</div><div class="d">下限</div></div>' +
-      '<div class="tl-tick active" data-v="' + v + '" style="position:absolute;left:' + cp + '%;transform:translateX(-50%)">' +
-        '<div class="q">' + money(v) + '</div><div class="d">当前</div></div>' +
-      '<div class="tl-tick" data-v="' + rg.max + '" style="margin-left:auto"><div class="q">' + money(rg.max) + '</div><div class="d">上限</div></div>';
+    var mid = q('#tlTicks .mid');
+    if (mid) {
+      // near either end the "current" tick would collide with the min/max tick
+      mid.style.display = (p < 4 || p > 96) ? 'none' : '';
+      mid.style.left = Math.max(9, Math.min(91, p)) + '%';
+      mid.dataset.v = v;
+      mid.querySelector('.q').textContent = money(v);
+    }
   }
+
+  function stepOf(rg) { return rg.max - rg.min > 20000 ? 500 : 100; }
 
   function bindSlider() {
     var track = q('#tlTrack');
-    function setFromEvent(ev) {
-      var c = current(), rg = rangeOf(c);
+    var dragging = false, pending = false, lastX = 0;
+
+    function valueAt(clientX) {
+      var rg = rangeOf(current());
       var r = track.getBoundingClientRect();
-      var ratio = clamp((ev.clientX - r.left) / r.width, 0, 1);
-      var step = rg.max - rg.min > 20000 ? 500 : 100;
-      var v = Math.round((rg.min + ratio * (rg.max - rg.min)) / step) * step;
-      state.gross = clamp(v, rg.min, rg.max);
+      var ratio = clamp((clientX - r.left) / r.width, 0, 1);
+      var st = stepOf(rg);
+      return clamp(Math.round((rg.min + ratio * (rg.max - rg.min)) / st) * st, rg.min, rg.max);
+    }
+    function apply(v) {
+      if (v === state.gross) return;
+      state.gross = v;
       renderChart();
     }
+    function frame() {
+      pending = false;
+      if (dragging) apply(valueAt(lastX));
+    }
+
     track.addEventListener('pointerdown', function (ev) {
-      track.setPointerCapture(ev.pointerId);
-      setFromEvent(ev);
-      track.dataset.drag = '1';
+      if (ev.button != null && ev.button !== 0) return;
+      ev.preventDefault();
+      dragging = true; dragActive = true;
+      lastX = ev.clientX;
+      document.body.classList.add('dragging');
+      state.gross = valueAt(ev.clientX);
+      renderChart();
     });
-    track.addEventListener('pointermove', function (ev) {
-      if (track.dataset.drag === '1') setFromEvent(ev);
+
+    // NOTE: no setPointerCapture -- under CDP-driven input a captured pointer can stall
+    // the compositor. Window-level listeners give the same "drag outside the track" behaviour.
+    window.addEventListener('pointermove', function (ev) {
+      if (!dragging) return;
+      lastX = ev.clientX;
+      if (!pending) { pending = true; requestAnimationFrame(frame); }
+    }, { passive: true });
+
+    function stop(ev) {
+      if (!dragging) return;
+      dragging = false; dragActive = false;
+      document.body.classList.remove('dragging');
+      apply(valueAt(ev.clientX));
+    }
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
+    window.addEventListener('blur', function () {
+      if (!dragging) return;
+      dragging = false; dragActive = false;
+      document.body.classList.remove('dragging');
     });
-    track.addEventListener('pointerup', function (ev) {
-      track.dataset.drag = '';
-      try { track.releasePointerCapture(ev.pointerId); } catch (e) {}
+
+    track.setAttribute('tabindex', '0');
+    track.setAttribute('role', 'slider');
+    track.addEventListener('keydown', function (ev) {
+      var rg = rangeOf(current()), st = stepOf(rg), v = state.gross, next = null;
+      if (ev.key === 'ArrowLeft' || ev.key === 'ArrowDown') next = v - st;
+      else if (ev.key === 'ArrowRight' || ev.key === 'ArrowUp') next = v + st;
+      else if (ev.key === 'Home') next = rg.min;
+      else if (ev.key === 'End') next = rg.max;
+      if (next == null) return;
+      ev.preventDefault();
+      apply(clamp(next, rg.min, rg.max));
     });
+
     q('#tlTicks').addEventListener('click', function (ev) {
       var t = ev.target.closest('.tl-tick');
       if (!t) return;
-      state.gross = +t.dataset.v;
-      renderChart();
+      apply(+t.dataset.v);
     });
   }
 
@@ -129,6 +188,7 @@
 
   function optionOf(g) {
     var labels = {};
+    var animate = !dragActive;
     g.nodes.forEach(function (n) { labels[n.name] = n.labelText; });
     chart.__labels = labels;
 
@@ -148,6 +208,7 @@
     });
 
     return {
+      animation: animate,
       animationDuration: 420,
       animationDurationUpdate: 320,
       backgroundColor: 'transparent',
@@ -200,11 +261,14 @@
 
     q('#chartTitle').textContent = c.name;
     q('#metaLine').textContent = g.meta;
-    renderTimeline();
+    if (tickCaseId !== c.id) buildTicks();
+    paintSlider();
 
     chart.__nodes = {};
     g.nodes.forEach(function (n) { chart.__nodes[n.name] = n; });
-    chart.setOption(optionOf(g), true);
+    var sig = g.nodes.map(function (n) { return n.name; }).join(',');
+    chart.setOption(optionOf(g), sig !== lastSig);
+    lastSig = sig;
     lastGraph = g;
     drawLabels(g);
     document.title = c.name + ' · 劳动收入组成';
