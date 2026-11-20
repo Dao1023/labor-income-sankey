@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>劳动收入桑基图 · 原生 SVG 最小实现</title>
+<style>
+  :root{ --bg:#f1f5f9; --card:#fff; --border:#e2e8f0; --text:#1e293b; --muted:#64748b; --blue:#1d55a5; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; padding:18px; background:var(--bg); color:var(--text); font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif; }
+  .app{ max-width:1440px; margin:0 auto; }
+  .bar{ display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+  .brand{ font-size:16px; font-weight:700; color:var(--blue); }
+  .tag{ display:inline-block; font-size:11px; font-weight:600; color:#64748b; background:#e2e8f0;
+        border-radius:999px; padding:2px 8px; margin-left:8px; vertical-align:2px; }
+  .actions{ display:flex; gap:8px; }
+  button{ appearance:none; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;
+          padding:8px 16px; border-radius:9px; border:1px solid #cbd5e1; background:#fff; color:var(--text);
+          transition:border-color .15s, color .15s, background .15s; }
+  button:hover{ border-color:var(--blue); color:var(--blue); background:#eff6ff; }
+  button:active{ transform:translateY(1px); }
+  button[disabled]{ opacity:.55; cursor:progress; }
+  .chart{ position:relative; background:#fff; border:1px solid var(--border); border-radius:12px;
+          overflow:hidden; box-shadow:0 1px 3px rgba(15,23,42,.06); }
+  #sankey{ display:block; width:100%; height:auto; }
+  .tip{ position:absolute; left:0; top:0; z-index:5; pointer-events:none; max-width:260px;
+        background:rgba(15,23,42,.94); color:#f8fafc; padding:9px 12px; border-radius:8px;
+        font-size:12.5px; line-height:1.5; box-shadow:0 6px 20px rgba(15,23,42,.28);
+        opacity:0; transition:opacity .12s; }
+  .tip.show{ opacity:1; }
+  .tt-h{ font-weight:700; margin-bottom:2px; }
+  .tt-v{ font-size:15px; font-weight:700; color:#93c5fd; font-variant-numeric:tabular-nums; }
+  .tt-s{ color:#cbd5e1; font-size:11.5px; }
+  .hint{ margin:10px 2px 0; color:var(--muted); font-size:12px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="bar">
+    <div class="brand">劳动收入桑基图<span class="tag">原生 SVG · 零依赖 · 4 层</span></div>
+    <div class="actions">
+      <button id="btnSvg" type="button">导出 SVG</button>
+      <button id="btnPng" type="button">导出 PNG</button>
+    </div>
+  </div>
+
+  <div class="chart" id="chart">
+    <svg id="sankey" role="img" aria-label="劳动收入流向桑基图"></svg>
+    <div class="tip" id="tip" role="tooltip"></div>
+  </div>
+
+  <p class="hint">hover 节点或流带查看明细 · 拖动窗口宽度查看响应式重排 · 数据为示意值，单位：元</p>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ───────────────────────── 1. 数据模型 ─────────────────────────
+     nodes: { id, label, layer, value?, color }
+       layer  : 列号 0..3（0=收入来源，1=大类，2=汇总，3=支出/结余）
+       value  : 可省略，缺省取 max(入流和, 出流和)
+     links: { source, target, value }
+     约束   : value 非负、无环、每个节点出流和 ≤ 自身 value。           */
+  const DATA = {
+    title: '劳动收入桑基图 · 2025 年度',
+    subtitle: '单位：元 · 示意数据',
+    nodes: [
+      { id: 'salary',   label: '全职薪资',   layer: 0, value: 180000, color: '#2563eb' },
+      { id: 'bonus',    label: '年终奖',     layer: 0, value:  45000, color: '#3b82c4' },
+      { id: 'parttime', label: '兼职 / 外包', layer: 0, value:  32000, color: '#0ea5e9' },
+      { id: 'side',     label: '副业收入',   layer: 0, value:  26000, color: '#6366f1' },
+      { id: 'invest',   label: '利息 / 分红', layer: 0, value:   9000, color: '#16a34a' },
+      { id: 'other',    label: '其他收入',   layer: 0, value:   4000, color: '#d4a017' },
+
+      { id: 'labor',    label: '劳动报酬',   layer: 1, value: 283000, color: '#3b82c4' },
+      { id: 'property', label: '财产性收入', layer: 1, value:   9000, color: '#16a34a' },
+      { id: 'othercat', label: '其他',       layer: 1, value:   4000, color: '#d4a017' },
+
+      { id: 'total',    label: '总收入',     layer: 2, value: 296000, color: '#1d55a5' },
+
+      { id: 'living',   label: '生活支出',   layer: 3, value: 132000, color: '#dc2626' },
+      { id: 'housing',  label: '住房',       layer: 3, value:  84000, color: '#b45309' },
+      { id: 'tax',      label: '税费',       layer: 3, value:  24000, color: '#7c3aed' },
+      { id: 'insure',   label: '保险与保障', layer: 3, value:  12000, color: '#0891b2' },
+      { id: 'saving',   label: '年度结余',   layer: 3, value:  44000, color: '#16a34a' }
+    ],
+    links: [
+      { source: 'salary',   target: 'labor',    value: 180000 },
+      { source: 'bonus',    target: 'labor',    value:  45000 },
+      { source: 'parttime', target: 'labor',    value:  32000 },
+      { source: 'side',     target: 'labor',    value:  26000 },
+      { source: 'invest',   target: 'property', value:   9000 },
+      { source: 'other',    target: 'othercat', value:   4000 },
+
+      { source: 'labor',    target: 'total',    value: 283000 },
+      { source: 'property', target: 'total',    value:   9000 },
+      { source: 'othercat', target: 'total',    value:   4000 },
+
+      { source: 'total',    target: 'living',   value: 132000 },
+      { source: 'total',    target: 'housing',  value:  84000 },
+      { source: 'total',    target: 'tax',      value:  24000 },
+      { source: 'total',    target: 'insure',   value:  12000 },
+      { source: 'total',    target: 'saving',   value:  44000 }
+    ]
+  };
+
+  /* ───────────────────────── 2. 常量与工具 ───────────────────────── */
+  const NODE_W = 26;      // 节点宽
+  const GAP = 16;         // 同列节点间距
+  const LABEL_H = 32;     // 标签块高（两行）
+  const LABEL_GAP = 34;   // 标签块最小间距（去重叠步长）
+  const H = 640;          // 画布高（宽度自适应）
+
+  const svgEl = document.getElementById('sankey');
+  const boxEl = document.getElementById('chart');
+  const tipEl = document.getElementById('tip');
+
+  let W = 1200;                 // 当前画布宽（响应式重算）
+  let nodes = [], links = [], byId = new Map();
+  let ky = 1, total = 0, hotEl = null;
+
+  const fmt = n => '¥' + Math.round(n).toLocaleString('en-US');
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const r2 = n => Math.round(n * 100) / 100;
+  const pads = w => w < 880 ? { L: 118, R: 150, T: 56, B: 38 }
+                            : { L: 150, R: 190, T: 56, B: 38 };
+
+  /* 无 layer 时用 Kahn 最长路径自动分层（有环图会停在出度为 0 的残留节点上） */
+  function resolveLayers(list, lks) {
+    if (list.every(n => Number.isInteger(n.layer))) return;
+    const indeg = new Map(list.map(n => [n.id, 0]));
+    const out = new Map(list.map(n => [n.id, []]));
+    lks.forEach(l => {
+      indeg.set(l.target, (indeg.get(l.target) || 0) + 1);
+      if (out.has(l.source)) out.get(l.source).push(l.target);
+    });
+    const depth = new Map(list.map(n => [n.id, Number.isInteger(n.layer) ? n.layer : 0]));
+    const q = list.filter(n => indeg.get(n.id) === 0).map(n => n.id);
+    while (q.length) {
+      const id = q.shift();
+      for (const t of out.get(id) || []) {
+        depth.set(t, Math.max(depth.get(t) || 0, (depth.get(id) || 0) + 1));
+        indeg.set(t, indeg.get(t) - 1);
+        if (indeg.get(t) === 0) q.push(t);
+      }
+    }
+    list.forEach(n => { if (!Number.isInteger(n.layer)) n.layer = depth.get(n.id) || 0; });
+  }
+
+  /* ───────────────────────── 3. 布局 ─────────────────────────
+     3.1 全局比例尺 ky = min over 列 [ (plotH - gap*(n-1)) / 列值和 ]
+     3.2 列内从上往下堆叠，整列在绘图区垂直居中
+     3.3 出流按「目标节点中心 y」排序、入流按「源节点中心 y」排序，再累加偏移  */
+  function layout() {
+    const P = pads(W);
+    const plotW = W - P.L - P.R;
+    const plotH = H - P.T - P.B;
+    const layers = [...new Set(nodes.map(n => n.layer))].sort((a, b) => a - b);
+    const maxLayer = layers.length ? layers[layers.length - 1] : 0;
+    const step = maxLayer > 0 ? (plotW - NODE_W) / maxLayer : 0;
+
+    const cols = new Map(layers.map(L => [L, nodes.filter(n => n.layer === L)]));
+
+    ky = Infinity;
+    cols.forEach(arr => {
+      const sum = arr.reduce((a, n) => a + n.value, 0);
+      if (sum > 0) ky = Math.min(ky, (plotH - GAP * (arr.length - 1)) / sum);
+    });
+    if (!isFinite(ky) || ky <= 0) ky = 1;
+
+    cols.forEach((arr, L) => {
+      arr.forEach(n => { n.x = P.L + L * step; n.h = n.value * ky; });
+      const colH = arr.reduce((a, n) => a + n.h, 0) + GAP * (arr.length - 1);
+      let y = P.T + Math.max(0, (plotH - colH) / 2);
+      arr.forEach(n => {
+        n.y = y;
+        n.cy = y + n.h / 2;
+        n.cx = n.x + NODE_W / 2;
+        y += n.h + GAP;
+      });
+    });
+
+    const outs = new Map(nodes.map(n => [n.id, []]));
+    const ins = new Map(nodes.map(n => [n.id, []]));
+    links.forEach(l => { outs.get(l.source).push(l); ins.get(l.target).push(l); });
+    outs.forEach(a => a.sort((p, q) => byId.get(p.target).cy - byId.get(q.target).cy));
+    ins.forEach(a => a.sort((p, q) => byId.get(p.source).cy - byId.get(q.source).cy));
+    outs.forEach((a, id) => { let y = byId.get(id).y; a.forEach(l => { l.y0 = y; y += l.value * ky; }); });
+    ins.forEach((a, id) => { let y = byId.get(id).y; a.forEach(l => { l.y1 = y; y += l.value * ky; }); });
+
+    links.forEach(l => {
+      l.w = l.value * ky;
+      l.x0 = byId.get(l.source).x + NODE_W;
+      l.x1 = byId.get(l.target).x;
+    });
+  }
+
+  /* 三次贝塞尔围成的闭合带：上边一条 C，下边反向一条 C（k = dx/2 ≈ curveness 0.5） */
+  function ribbon(x0, y0, x1, y1, w) {
+    const k = Math.max(4, (x1 - x0) * 0.5);
+    return 'M' + r2(x0) + ',' + r2(y0) +
+      ' C' + r2(x0 + k) + ',' + r2(y0) + ' ' + r2(x1 - k) + ',' + r2(y1) + ' ' + r2(x1) + ',' + r2(y1) +
+      ' L' + r2(x1) + ',' + r2(y1 + w) +
+      ' C' + r2(x1 - k) + ',' + r2(y1 + w) + ' ' + r2(x0 + k) + ',' + r2(y0 + w) + ' ' + r2(x0) + ',' + r2(y0 + w) +
+      ' Z';
+  }
+
+  /* 一维标签去重叠：前向推挤（保证间距）→ 后向回夹（不越底） */
+  function placeLabels(arr) {
+    if (!arr.length) return;
+    arr.sort((a, b) => a.desired - b.desired);
+    const MIN = 8, MAX = H - 8 - LABEL_H;
+    let prev = -Infinity;
+    for (const it of arr) { it.top = Math.max(it.desired, MIN, prev + LABEL_GAP); prev = it.top; }
+    let next = Infinity;
+    for (let i = arr.length - 1; i >= 0; i--) {
+      arr[i].top = Math.min(arr[i].top, next - LABEL_GAP);
+      next = arr[i].top;
+    }
+    for (const it of arr) it.top = Math.max(it.top, MIN);
+  }
+
+  /* ───────────────────────── 4. 渲染 ───────────────────────── */
+  const SVG_STYLE = `
+    .link{ fill-opacity:.42; transition:fill-opacity .16s; }
+    .link.on{ fill-opacity:.85; }
+    .node rect{ stroke:rgba(15,23,42,.18); stroke-width:1; }
+    .node,.nlbl,.link{ transition:opacity .16s; }
+    .lbl{ paint-order:stroke; stroke:#fff; stroke-width:3px; stroke-linejoin:round; }
+    .lbl.name{ font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif; font-size:13px; font-weight:600; fill:#1e293b; }
+    .lbl.val{ font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif; font-size:11.5px; font-weight:500; fill:#64748b; font-variant-numeric:tabular-nums; }
+    .leader{ stroke:#cbd5e1; stroke-width:1; fill:none; pointer-events:none; }
+    .ttl{ font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif; font-size:17px; font-weight:700; fill:#1d55a5; }
+    .sub{ font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif; font-size:11.5px; fill:#64748b; }
+    .foot{ font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif; font-size:11px; fill:#94a3b8; }
+    svg.focusing .node, svg.focusing .link, svg.focusing .nlbl{ opacity:.2; }
+    svg.focusing .node.on, svg.focusing .link.on, svg.focusing .nlbl.on{ opacity:1; }
+    .enter .node, .enter .link, .enter .nlbl{ animation:sankeyIn .48s cubic-bezier(.2,.7,.3,1) both; }
+    @keyframes sankeyIn{ from{ opacity:0; } to{ opacity:1; } }
+    @media (prefers-reduced-motion: reduce){ .enter .node,.enter .link,.enter .nlbl{ animation:none; } }
+  `;
+
+  /* SVG 构造小工具：用 DOM API 而不是拼字符串，天然转义、也方便以后给单个节点挂事件 */
+  const NS = 'http://www.w3.org/2000/svg';
+  const labelBoxes = [];   // 标签占位盒，供 stats() 做重叠检测（不依赖 getBBox）
+
+  function el(tag, attrs, kids) {
+    const n = document.createElementNS(NS, tag);
+    if (attrs) for (const k in attrs) if (attrs[k] != null) n.setAttribute(k, attrs[k]);
+    if (kids) for (const c of [].concat(kids)) {
+      if (c == null || c === '') continue;
+      n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+    }
+    return n;
+  }
+
+  /* 文本测宽（不量 DOM）：CJK 记 1em、西文记 0.55em，够做标签重叠检测与引导线判断 */
+  function textW(s, size) {
+    let w = 0;
+    for (const ch of String(s)) w += /[\u2E80-\uFFFF]/.test(ch) ? size : size * 0.55;
+    return w;
+  }
+
+  function render() {
+    prepare();
+    layout();
+
+    const P = pads(W);
+    labelBoxes.length = 0;
+    const root = [];
+
+    root.push(el('style', null, [SVG_STYLE]));
+    root.push(el('rect', { x: 0, y: 0, width: W, height: H, fill: '#ffffff' }));
+    root.push(el('text', { class: 'ttl', x: P.L, y: 30 }, [DATA.title]));
+    root.push(el('text', { class: 'sub', x: W - P.R, y: 30, 'text-anchor': 'end' }, [DATA.subtitle]));
+    root.push(el('line', { x1: P.L, y1: 44, x2: W - P.R, y2: 44, stroke: '#e2e8f0' }));
+
+    // 流带：颜色继承源节点，透明度交给 CSS（.link 默认 .42，聚焦时 .85）
+    links.forEach((l, i) => {
+      root.push(el('path', {
+        class: 'link', 'data-kind': 'link', 'data-id': String(i),
+        d: ribbon(l.x0, l.y0, l.x1, l.y1, l.w),
+        fill: byId.get(l.source).color
+      }));
+    });
+
+    // 节点：一根竖条，宽度固定、高度 = value * ky
+    nodes.forEach(n => {
+      root.push(el('g', { class: 'node', 'data-kind': 'node', 'data-id': n.id }, [
+        el('rect', { x: r2(n.x), y: r2(n.y), width: NODE_W, height: r2(n.h), rx: 2, fill: n.color })
+      ]));
+    });
+
+    // 标签：首列放左侧、末列放右侧、中间列放块上方；同列一维去重叠 + 引导线
+    const maxLayer = Math.max.apply(null, nodes.map(n => n.layer));
+    const labels = nodes.map(n => {
+      const side = n.layer === 0 ? 'left' : (n.layer === maxLayer ? 'right' : 'top');
+      return {
+        n, side,
+        desired: side === 'top' ? n.y - LABEL_H - 6 : n.cy - LABEL_H / 2,
+        top: 0
+      };
+    });
+    const groups = new Map();
+    labels.forEach(L => {
+      if (!groups.has(L.side)) groups.set(L.side, []);
+      groups.get(L.side).push(L);
+    });
+    groups.forEach(placeLabels);
+
+    for (const L of labels) {
+      const n = L.n, mid = L.top + LABEL_H / 2;
+      const anchor = L.side === 'left' ? 'end' : (L.side === 'right' ? 'start' : 'middle');
+      const x = L.side === 'left' ? n.x - 12 : (L.side === 'right' ? n.x + NODE_W + 12 : n.cx);
+      const kids = [];
+      if (L.side === 'left' && Math.abs(mid - n.cy) > 3) {
+        kids.push(el('path', { class: 'leader', d: 'M' + r2(n.x) + ',' + r2(n.cy) + ' L' + r2(n.x - 11) + ',' + r2(mid) }));
+      } else if (L.side === 'right' && Math.abs(mid - n.cy) > 3) {
+        kids.push(el('path', { class: 'leader', d: 'M' + r2(n.x + NODE_W) + ',' + r2(n.cy) + ' L' + r2(n.x + NODE_W + 11) + ',' + r2(mid) }));
+      } else if (L.side === 'top' && n.y - (L.top + LABEL_H) > 6) {
+        kids.push(el('path', { class: 'leader', d: 'M' + r2(n.cx) + ',' + r2(n.y) + ' L' + r2(n.cx) + ',' + r2(L.top + LABEL_H) }));
+      }
+      kids.push(el('text', { class: 'lbl name', x: r2(x), y: r2(L.top + 12), 'text-anchor': anchor }, [n.label]));
+      kids.push(el('text', { class: 'lbl val', x: r2(x), y: r2(L.top + 27), 'text-anchor': anchor }, [fmt(n.value)]));
+      root.push(el('g', { class: 'nlbl', 'data-kind': 'node', 'data-id': n.id }, kids));
+
+      const w = Math.max(textW(n.label, 13), textW(fmt(n.value), 11.5)) + 4;
+      const bx = anchor === 'end' ? x - w : (anchor === 'start' ? x : x - w / 2);
+      labelBoxes.push({ id: n.id, x: bx, y: L.top, w, h: LABEL_H });
+    }
+
+    root.push(el('text', { class: 'foot', x: P.L, y: H - 12 }, [
+      '4 层：收入来源 → 收入大类 → 总收入 → 支出 / 结余 · 原生 SVG，无第三方库'
+    ]));
+
+    svgEl.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svgEl.setAttribute('width', W);
+    svgEl.setAttribute('height', H);
+    svgEl.textContent = '';                 // 清空旧的场景图
+    root.forEach(n => svgEl.appendChild(n));
+  }
+
+  function prepare() {
+    const raw = DATA.nodes.map(n => Object.assign({}, n));
+    const lks = DATA.links.map((l, i) => Object.assign({}, l, { i }));
+    resolveLayers(raw, lks);
+
+    byId = new Map(raw.map(n => [n.id, n]));
+    raw.forEach(n => { n.in = 0; n.out = 0; });
+    lks.forEach(l => {
+      const s = byId.get(l.source), t = byId.get(l.target);
+      if (!s || !t) throw new Error('未知节点：' + l.source + ' → ' + l.target);
+      s.out += l.value; t.in += l.value;
+    });
+    raw.forEach(n => { n.value = Math.max(n.value || 0, n.in, n.out); });
+
+    nodes = raw;
+    links = lks;
+    total = nodes.reduce((m, n) => Math.max(m, n.value), 0);
+  }
+
+  /* ───────────────────────── 5. 交互：hover 高亮 + tooltip ───────────────────────── */
+  function setFocus(el) {
+    const kind = el.dataset.kind, id = el.dataset.id;
+    const keepNode = new Set(), keepLink = new Set();
+    if (kind === 'node') {
+      keepNode.add(id);
+      links.forEach((l, i) => {
+        if (l.source === id || l.target === id) {
+          keepNode.add(l.source); keepNode.add(l.target); keepLink.add(String(i));
+        }
+      });
+    } else {
+      const l = links[Number(id)];
+      keepNode.add(l.source); keepNode.add(l.target); keepLink.add(id);
+    }
+    svgEl.classList.add('focusing');
+    svgEl.querySelectorAll('[data-kind]').forEach(node => {
+      const on = node.dataset.kind === 'link'
+        ? keepLink.has(node.dataset.id)
+        : keepNode.has(node.dataset.id);
+      node.classList.toggle('on', on);
+    });
+    showTip(kind, id);
+  }
+
+  function showTip(kind, id) {
+    let html;
+    if (kind === 'node') {
+      const n = byId.get(id);
+      const share = total > 0 ? (n.value / total * 100).toFixed(1) : '0.0';
+      html = '<div class="tt-h">' + esc(n.label) + '</div>' +
+             '<div class="tt-v">' + fmt(n.value) + '</div>' +
+             '<div class="tt-s">占总收入 ' + share + '%</div>';
+    } else {
+      const l = links[Number(id)], s = byId.get(l.source), t = byId.get(l.target);
+      const share = s.value > 0 ? (l.value / s.value * 100).toFixed(1) : '0.0';
+      html = '<div class="tt-h">' + esc(s.label) + ' → ' + esc(t.label) + '</div>' +
+             '<div class="tt-v">' + fmt(l.value) + '</div>' +
+             '<div class="tt-s">占「' + esc(s.label) + '」' + share + '%</div>';
+    }
+    tipEl.innerHTML = html;
+    tipEl.classList.add('show');
+  }
+
+  function moveTip(e) {
+    const r = boxEl.getBoundingClientRect();
+    let x = e.clientX - r.left + 16;
+    let y = e.clientY - r.top + 16;
+    const w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+    if (x + w > r.width - 6) x = e.clientX - r.left - w - 16;
+    if (y + h > r.height - 6) y = e.clientY - r.top - h - 16;
+    tipEl.style.transform = 'translate(' + Math.max(4, x) + 'px,' + Math.max(4, y) + 'px)';
+  }
+
+  function clearFocus() {
+    hotEl = null;
+    svgEl.classList.remove('focusing');
+    svgEl.querySelectorAll('.on').forEach(n => n.classList.remove('on'));
+    tipEl.classList.remove('show');
+  }
+
+  svgEl.addEventListener('pointermove', e => {
+    const el = e.target.closest ? e.target.closest('[data-kind]') : null;
+    if (!el) { if (hotEl) clearFocus(); return; }
+    if (el !== hotEl) { hotEl = el; setFocus(el); }
+    moveTip(e);
+  });
+  svgEl.addEventListener('pointerleave', clearFocus);
+  window.addEventListener('blur', clearFocus);
+
+  /* ───────────────────────── 6. 导出 ─────────────────────────
+     样式全部写在 <svg> 内部的 <style> 里，序列化后样式不丢；
+     导出前摘掉 .enter / .focusing / .on，避免半透明动画帧被烘进图片。 */
+  function svgString() {
+    const clone = svgEl.cloneNode(true);
+    clone.classList.remove('enter', 'focusing');
+    clone.querySelectorAll('.on').forEach(n => n.classList.remove('on'));
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clone.setAttribute('width', W);
+    clone.setAttribute('height', H);
+    clone.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(clone);
+  }
+
+  async function pngBlob(scale) {
+    const url = URL.createObjectURL(new Blob([svgString()], { type: 'image/svg+xml;charset=utf-8' }));
+    try {
+      const img = await new Promise((res, rej) => {
+        const i = new Image();
+        i.onload = () => res(i);
+        i.onerror = () => rej(new Error('SVG 栅格化失败'));
+        i.src = url;
+      });
+      const c = document.createElement('canvas');
+      c.width = Math.round(W * scale);
+      c.height = Math.round(H * scale);
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      return await new Promise(res => c.toBlob(b => res(b), 'image/png'));
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  function stamp() {
+    const d = new Date(), p = v => String(v).padStart(2, '0');
+    return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate());
+  }
+
+  function download(blob, name) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function exportSVG() {
+    download(new Blob([svgString()], { type: 'image/svg+xml;charset=utf-8' }),
+             'labor-income-sankey-' + stamp() + '.svg');
+  }
+
+  async function exportPNG() {
+    const blob = await pngBlob(2);
+    if (blob) download(blob, 'labor-income-sankey-' + stamp() + '.png');
+  }
+
+  /* ───────────────────────── 7. 响应式 ───────────────────────── */
+  function measure() {
+    const w = Math.max(640, Math.floor(boxEl.clientWidth));
+    if (w === W) return false;
+    W = w;
+    return true;
+  }
+
+  let raf = 0;
+  function schedule() {
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => { measure(); render(); });
+  }
+
+  /* ───────────────────────── 8. 启动 ───────────────────────── */
+  document.getElementById('btnSvg').addEventListener('click', exportSVG);
+  document.getElementById('btnPng').addEventListener('click', async e => {
+    const b = e.currentTarget;
+    b.disabled = true;
+    try { await exportPNG(); } finally { b.disabled = false; }
+  });
+
+  measure();
+  render();
+  svgEl.classList.add('enter');
+  setTimeout(() => svgEl.classList.remove('enter'), 700);
+
+  if (window.ResizeObserver) new ResizeObserver(schedule).observe(boxEl);
+  else window.addEventListener('resize', schedule);
+
+  /* 供复用/验证使用的最小 API */
+  window.LaborSankey = {
+    render,
+    svgString,
+    pngBlob,
+    exportSVG,
+    exportPNG,
+    stats: function () {
+      const paths = [...svgEl.querySelectorAll('path.link')];
+      const bad = paths.filter(p => /NaN|undefined|null/.test(p.getAttribute('d') || '')).length;
+      let overlaps = 0;
+      for (let i = 0; i < labelBoxes.length; i++) {
+        for (let j = i + 1; j < labelBoxes.length; j++) {
+          const a = labelBoxes[i], b = labelBoxes[j];
+          if (a.x < b.x + b.w && b.x < a.x + a.w &&
+              a.y < b.y + b.h && b.y < a.y + a.h) overlaps++;
+        }
+      }
+      return {
+        width: W, height: H,
+        nodes: nodes.length, links: links.length,
+        paths: paths.length, labels: labelBoxes.length,
+        badPaths: bad, labelOverlaps: overlaps,
+        outOfCanvas: nodes.filter(n => n.y < 0 || n.y + n.h > H).length,
+        ky: Math.round(ky * 1e6) / 1e6
+      };
+    }
+  };
+})();
+</script>
+</body>
+</html>
