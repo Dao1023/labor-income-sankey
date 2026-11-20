@@ -1,0 +1,1816 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>劳动收入组成 · 一张桑基图看懂工资被谁分走</title>
+<style>
+  :root{
+    --bg:#eef1f7; --card:#fff; --ink:#16233a; --ink2:#3c4a60; --mut:#77859b;
+    --line:#e5e9f1; --accent:#1d55a5; --accent2:#2f6fd0;
+    --chart:#fdfcf9; --chart-line:#eae5da;
+    --green:#16a34a; --red:#e11d48; --teal:#0e9aa7; --amber:#d97706;
+    --shadow:0 1px 2px rgba(15,23,42,.05), 0 18px 40px -28px rgba(15,23,42,.35);
+    --r:16px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:"Inter","Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    color:var(--ink); background:
+      radial-gradient(1100px 500px at 12% -8%, #fff 0%, rgba(255,255,255,0) 60%),
+      radial-gradient(900px 600px at 105% 0%, #e6ecf8 0%, rgba(230,236,248,0) 55%),
+      var(--bg);
+    -webkit-font-smoothing:antialiased; font-size:14px; line-height:1.5;
+  }
+  h1,h2,h3,p{margin:0}
+  button{font:inherit;color:inherit;cursor:pointer}
+
+  .app{max-width:1600px;margin:0 auto;padding:18px 22px 40px}
+
+  /* ---------- 顶栏 ---------- */
+  .top{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:2px 2px 16px}
+  .brand{display:flex;align-items:center;gap:13px}
+  .mark{
+    width:42px;height:42px;border-radius:13px;display:grid;place-items:center;
+    background:linear-gradient(145deg,#2f6fd0,#1a4a92);color:#fff;font-weight:800;font-size:20px;
+    box-shadow:0 8px 18px -8px rgba(29,85,165,.8);letter-spacing:-.02em;
+  }
+  .brand h1{font-size:20px;letter-spacing:-.01em;font-weight:750;color:#14325c}
+  .brand p{font-size:12px;color:var(--mut);margin-top:-1px}
+  .tools{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .seg{display:inline-flex;background:#e7ecf5;border-radius:10px;padding:3px;gap:2px}
+  .seg button{
+    border:0;background:transparent;padding:6px 12px;border-radius:8px;font-size:12.5px;color:#5a6a80;
+    transition:.18s; font-weight:600;
+  }
+  .seg button.on{background:#fff;color:var(--accent);box-shadow:0 1px 3px rgba(15,23,42,.12)}
+  .seg button:disabled{opacity:.4;cursor:not-allowed}
+  .seg.small button{padding:4px 10px;font-size:12px}
+  .sel{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut);
+       background:#fff;border:1px solid var(--line);border-radius:10px;padding:5px 8px}
+  .sel select{border:0;background:transparent;font:inherit;font-size:12.5px;color:var(--ink);outline:none;padding-right:2px}
+  .ghost{
+    background:#fff;border:1px solid var(--line);border-radius:10px;padding:7px 11px;font-size:12.5px;
+    color:var(--ink2);transition:.16s;font-weight:500;
+  }
+  .ghost:hover{border-color:#c8d3e4;color:var(--accent);box-shadow:0 4px 12px -8px rgba(15,23,42,.5)}
+
+  /* ---------- 布局 ---------- */
+  .layout{display:grid;grid-template-columns:238px minmax(0,1fr) 320px;gap:16px;align-items:start}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+
+  /* ---------- 左栏 ---------- */
+  .rail{padding:14px 12px 12px;position:sticky;top:14px;max-height:calc(100vh - 30px);display:flex;flex-direction:column}
+  .rail-t{display:flex;align-items:baseline;justify-content:space-between;padding:0 4px 10px}
+  .rail-t b{font-size:13.5px;font-weight:700;letter-spacing:.01em}
+  .rail-t span{font-size:10.5px;color:var(--mut)}
+  .groups{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
+  .chip{
+    display:flex;align-items:center;gap:5px;border:1px solid transparent;background:#f4f6fa;
+    border-radius:9px;padding:6px 7px;font-size:11.5px;color:#4a5a72;font-weight:550;transition:.15s;
+    overflow:hidden;white-space:nowrap;
+  }
+  .chip span{font-size:12px;line-height:1}
+  .chip:hover{background:#eaeff8}
+  .chip.on{background:#e9f0fb;border-color:#c4d6f2;color:var(--accent);font-weight:700}
+  .cases{overflow:auto;flex:1;margin:0 -4px;padding:0 4px}
+  .case{
+    display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:transparent;border:0;
+    border-radius:10px;padding:8px 8px;transition:.15s;margin-bottom:2px;
+  }
+  .case:hover{background:#f5f8fd}
+  .case.on{background:#eef4fd;box-shadow:inset 0 0 0 1px #cfe0f7}
+  .case .ci{width:26px;height:26px;border-radius:8px;background:#f2f5fa;display:grid;place-items:center;font-size:13.5px;flex:0 0 auto}
+  .case.on .ci{background:#fff}
+  .cm{display:flex;flex-direction:column;min-width:0}
+  .cm b{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cm i{font-style:normal;font-size:10.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .case.on .cm b{color:var(--accent)}
+
+  /* ---------- 主区 ---------- */
+  .stage{padding:14px 16px 12px;min-width:0}
+  .stage-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:2px 4px 10px}
+  .ct{display:flex;align-items:center;gap:11px;min-width:0}
+  .ct .ci{font-size:26px;line-height:1;filter:saturate(.9)}
+  .ct h2{font-size:18px;letter-spacing:-.01em;font-weight:750;color:#14325c;line-height:1.2}
+  .ct p{font-size:11.5px;color:var(--mut);margin-top:1px}
+  .tag{font-size:11px;color:#8a5a12;background:#fdf4e3;border:1px solid #f3e2c4;border-radius:999px;padding:3px 9px;white-space:nowrap}
+  .chart-wrap{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--chart-line);background:var(--chart)}
+  #sankey{display:block;width:100%}
+  .tip{
+    position:absolute;left:0;top:0;pointer-events:none;opacity:0;transition:opacity .12s;
+    background:rgba(20,32,52,.96);color:#fff;border-radius:11px;padding:10px 12px;font-size:12px;
+    min-width:150px;max-width:250px;box-shadow:0 14px 34px -12px rgba(15,23,42,.6);z-index:5;
+  }
+  .tip.show{opacity:1}
+  .tt-h{display:flex;align-items:center;gap:7px;font-weight:600;font-size:12.5px;color:#fff}
+  .tt-h .dot{width:8px;height:8px;border-radius:2px;flex:0 0 auto}
+  .tt-h i{font-style:normal;color:#8fa2bd;margin:0 2px}
+  .tt-v{font-size:19px;font-weight:750;margin:5px 0 6px;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+  .tt-v span{font-size:11px;font-weight:500;color:#9fb0c8;margin-left:3px}
+  .tt-rows{display:flex;flex-direction:column;gap:3px;border-top:1px solid rgba(255,255,255,.14);padding-top:6px}
+  .tt-rows div{display:flex;justify-content:space-between;gap:14px;color:#c3d0e2;font-size:11.5px}
+  .tt-rows b{color:#fff;font-weight:600;font-variant-numeric:tabular-nums}
+  .tt-note{margin-top:7px;color:#9fb0c8;font-size:11px;line-height:1.45;border-top:1px dashed rgba(255,255,255,.12);padding-top:6px}
+
+  .legend{display:flex;align-items:center;gap:16px;padding:9px 6px 2px;flex-wrap:wrap}
+  .lg{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mut)}
+  .lg i{width:9px;height:9px;border-radius:2.5px;display:inline-block}
+
+  .controls{display:flex;gap:22px;align-items:center;padding:10px 6px 2px;flex-wrap:wrap}
+  .ctl{min-width:180px}
+  .ctl.grow{flex:1;min-width:260px}
+  .ctl-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:5px}
+  .ctl-h label{font-size:11.5px;color:var(--mut);font-weight:600;letter-spacing:.02em}
+  .ctl-h b{font-size:13px;font-variant-numeric:tabular-nums;color:var(--ink);font-weight:700}
+  .ctl-f{display:flex;justify-content:space-between;gap:8px;font-size:10px;color:#9aa6b8;margin-top:3px}
+  .ctl-f span:nth-child(2){text-align:center;flex:1}
+
+  input[type=range].range{-webkit-appearance:none;appearance:none;width:100%;height:22px;background:transparent;margin:0}
+  input[type=range].range::-webkit-slider-runnable-track{height:4px;border-radius:99px;background:#e3e8f1}
+  input[type=range].range::-webkit-slider-thumb{
+    -webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:#fff;border:4px solid var(--accent);
+    margin-top:-5.5px;box-shadow:0 2px 6px rgba(29,85,165,.35);cursor:pointer;transition:.15s;
+  }
+  input[type=range].range::-webkit-slider-thumb:hover{transform:scale(1.08)}
+  input[type=range].range::-moz-range-track{height:4px;border-radius:99px;background:#e3e8f1}
+  input[type=range].range::-moz-range-thumb{width:11px;height:11px;border-radius:50%;background:#fff;border:4px solid var(--accent);cursor:pointer}
+
+  /* ---------- 右栏 ---------- */
+  .side{display:flex;flex-direction:column;gap:12px;position:sticky;top:14px}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:13px;padding:11px 12px 10px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .stat::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+  .stat.green::before{background:var(--green)}
+  .stat.teal::before{background:var(--teal)}
+  .stat.red::before{background:var(--red)}
+  .stat-k{font-size:10.5px;color:var(--mut);font-weight:600;letter-spacing:.03em}
+  .stat-v{font-size:20px;font-weight:750;letter-spacing:-.02em;margin-top:2px;font-variant-numeric:tabular-nums;color:#14325c}
+  .stat-v span{font-size:10.5px;font-weight:500;color:#9aa6b8;margin-left:3px;letter-spacing:0}
+  .stat-s{font-size:10.5px;color:#8b98ab;margin-top:2px;line-height:1.35}
+  .stat.green .stat-v{color:#15803d}
+  .stat.red .stat-v{color:#be123c}
+  .stat.teal .stat-v{color:#0e7490}
+
+  .side-t{font-size:11px;font-weight:700;color:#8b98ab;letter-spacing:.08em;padding:11px 13px 6px}
+  .table{padding:0 13px 4px}
+  .tr{display:flex;justify-content:space-between;gap:12px;padding:4px 0;font-size:12px;border-bottom:1px dashed #eef1f6}
+  .tr:last-child{border-bottom:0}
+  .tr span{color:var(--ink2)}
+  .tr b{font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink)}
+  .tr.sub span{color:var(--mut)}
+  .tr.sub b{color:#4b5a70;font-weight:500}
+  .tr.ind{padding-left:9px;font-size:11.5px}
+  .tr.ind span::before{content:"·";margin-right:5px;color:#c3ccda}
+  .tr.strong b{font-size:13px}
+  .tr.net{background:#f1faf4;margin:4px -6px;padding:6px;border-radius:8px;border-bottom:0}
+  .tr.net b{color:#15803d;font-weight:750;font-size:13.5px}
+  .tr.tax b{color:#be123c}
+  .tr.refund b{color:#0e7490}
+  .tr.cost b{color:#14325c}
+  .tr-sep{height:1px;background:#e9edf4;margin:6px 0}
+  .tiny{font-size:10px;color:#9aa6b8;line-height:1.5;padding:4px 13px 12px;margin:0}
+
+  .note-card p{font-size:12px;color:#41506a;line-height:1.62;padding:0 13px}
+  .note-card .caveat{font-size:11px;color:#9a7a4a;background:#fdf8ee;border-radius:8px;padding:7px 9px;margin:9px 13px 13px;line-height:1.5}
+
+  footer{display:flex;gap:14px;flex-wrap:wrap;align-items:center;padding:18px 4px 0;font-size:10.5px;color:#93a0b3}
+  footer a{color:#7b8da6;text-decoration:none;border-bottom:1px dotted #c3ccda}
+  footer a:hover{color:var(--accent)}
+
+  dialog{border:0;border-radius:18px;padding:0;max-width:560px;width:calc(100% - 40px);box-shadow:0 30px 80px -20px rgba(15,23,42,.5)}
+  dialog::backdrop{background:rgba(18,28,45,.45);backdrop-filter:blur(2px)}
+  .modal-h{display:flex;justify-content:space-between;align-items:center;padding:18px 20px 8px}
+  .modal-h h3{font-size:16px;color:#14325c}
+  .modal-b{padding:0 20px 20px;font-size:12.5px;color:#41506a;line-height:1.7}
+  .modal-b h4{font-size:11px;letter-spacing:.08em;color:#8b98ab;margin:14px 0 5px}
+  .modal-b ul{margin:0;padding-left:16px}
+  .modal-b li{margin:3px 0}
+  .modal-b a{color:var(--accent2);text-decoration:none}
+  .x{border:0;background:#f2f5fa;width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-size:14px;color:#6b7a90}
+
+  @media (max-width:1320px){
+    .layout{grid-template-columns:220px minmax(0,1fr) 290px}
+  }
+  @media (max-width:1150px){
+    .layout{grid-template-columns:210px minmax(0,1fr)}
+    .side{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 1fr;position:static}
+    .stats{grid-template-columns:1fr 1fr}
+  }
+  @media (max-width:820px){
+    .app{padding:12px 12px 30px}
+    .layout{grid-template-columns:1fr}
+    .rail{position:static;max-height:none}
+    .cases{max-height:220px}
+    .side{grid-template-columns:1fr}
+    .top{align-items:flex-start;flex-direction:column}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <div class="mark">¥</div>
+      <div>
+        <h1>劳动收入组成</h1>
+        <p>同样一份工资，被谁分走了 · 2026 社保年度 · 单位：元 / 月</p>
+      </div>
+    </div>
+    <div class="tools">
+      <div class="seg" id="viewToggle">
+        <button data-view="personal" class="on">个人视角</button>
+        <button data-view="cost" title="显示单位为你额外支付的部分">单位成本</button>
+      </div>
+      <label class="sel">城市<select id="city"></select></label>
+      <button class="ghost" id="btnInfo">数据口径</button>
+      <button class="ghost" id="btnSvg">导出 SVG</button>
+      <button class="ghost" id="btnPng">导出 PNG</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="rail card">
+      <div class="rail-t"><b>选择案例</b><span>30 种用工形态</span></div>
+      <div class="groups" id="groups"></div>
+      <div class="cases" id="cases"></div>
+    </aside>
+
+    <main class="stage card">
+      <div class="stage-top">
+        <div class="ct">
+          <span class="ci" id="caseIcon">🏛️</span>
+          <div><h2 id="caseName">公务员</h2><p id="caseLegal"></p></div>
+        </div>
+        <span class="tag" id="caseTag"></span>
+      </div>
+
+      <div class="chart-wrap" id="chartWrap">
+        <svg id="sankey" role="img" aria-label="劳动收入流向桑基图"></svg>
+        <div class="tip" id="tip" role="tooltip"></div>
+      </div>
+
+      <div class="legend">
+        <span class="lg"><i style="background:#2563eb"></i>收入构成</span>
+        <span class="lg"><i style="background:#1d55a5"></i>税前应发</span>
+        <span class="lg"><i style="background:#9b8af0"></i>五险一金</span>
+        <span class="lg"><i style="background:#e11d48"></i>个税</span>
+        <span class="lg"><i style="background:#16a34a"></i>到手现金</span>
+        <span class="lg"><i style="background:#0ea5e9"></i>养老个人账户</span>
+        <span class="lg"><i style="background:#0d9488"></i>公积金 / 年金</span>
+        <span class="lg"><i style="background:#d97706"></i>平台与中介</span>
+      </div>
+
+      <div class="controls">
+        <div class="ctl grow">
+          <div class="ctl-h"><label id="grossLabel">税前月均</label><b id="grossVal">¥12,000</b></div>
+          <input type="range" id="rGross" class="range">
+          <div class="ctl-f"><span id="grossMin"></span><span id="sliderHint"></span><span id="grossMax"></span></div>
+        </div>
+        <div class="ctl">
+          <div class="ctl-h"><label>专项附加扣除</label><b id="deductVal">¥3,000</b></div>
+          <input type="range" id="rDeduct" class="range" min="0" max="6000" step="500" value="3000">
+        </div>
+        <div class="ctl">
+          <div class="ctl-h"><label>公积金比例</label><b></b></div>
+          <div class="seg small" id="fundSeg">
+            <button data-v="0.05">5%</button>
+            <button data-v="0.07" class="on">7%</button>
+            <button data-v="0.12">12%</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <aside class="side">
+      <div class="stats" id="stats"></div>
+      <div class="card table-card">
+        <div class="side-t">月度拆解</div>
+        <div class="table" id="table"></div>
+        <p class="tiny" id="tableNote"></p>
+      </div>
+      <div class="card note-card">
+        <div class="side-t">这个案例在说什么</div>
+        <p id="caseNote"></p>
+        <p class="caveat" id="caseCaveat"></p>
+      </div>
+    </aside>
+  </div>
+
+  <footer>
+    <span>数据口径：个税与社保按 2026 年度公开规则近似计算，案例薪资为区间中位数估算。</span>
+    <span id="srcLinks"></span>
+  </footer>
+</div>
+
+<dialog id="infoModal">
+  <div class="modal-h">
+    <h3>数据口径与假设</h3>
+    <button class="x" id="btnCloseInfo" aria-label="关闭">✕</button>
+  </div>
+  <div class="modal-b">
+    <h4>基本假设</h4>
+    <ul>
+      <li>金额为「元 / 月」，年度税额算完后摊到每月；不含年终奖单独计税的月度预扣差异。</li>
+      <li>社保基数按本人上年月均工资，在当年度上下限内浮动；「按最低基数」是不少民企的实际做法。</li>
+      <li>公积金个人与单位同比例，全部进入个人账户，所以单独画成「账户」而不是「税」。</li>
+      <li>劳务报酬展示的是<strong>预扣</strong>；年度汇算按 80% 并入综合所得，右侧会给出可退金额。</li>
+      <li>平台抽成、MCN 分成、包工头抽成不是税，是私人部门分成，单独一条流。</li>
+      <li>「按最低基数缴」是常见做法，<strong>不是合规做法</strong>：员工可主张补缴，差额由单位承担。</li>
+      <li>非全日制（兼职）单位只缴工伤；个人养老医疗需自己以灵活就业身份缴，图中未计入。</li>
+      <li>建筑、家政、日结按「普遍未申报」建模（税 0），这是<strong>事实描述，不是合法免缴</strong>。</li>
+      <li>上海公积金 12% = 7% 基本 + 5% 补充；北京、深圳可直接缴到 12%。</li>
+      <li>节点太薄时标签自动隐藏，悬停可看明细；年终奖在 3.6 万 / 14.4 万 / 30 万处有税率断崖。</li>
+      <li>不计增值税及附加、企业残保金、工会经费等次要项目。</li>
+    </ul>
+    <h4>数据来源</h4>
+    <ul id="srcList"></ul>
+    <h4>免责</h4>
+    <p>用于理解结构，不构成税务或劳动法建议。各地执行细则差异大，个案请以主管机关口径为准。</p>
+  </div>
+</dialog>
+
+<script>
+/* 劳动收入组成 · 数据层
+   口径：2026 社保年度（2026-07 起），金额单位「元 / 月」。
+   收入构成 comp = [基本工资, 绩效, 年终奖, 加班费, 津贴补贴, 股权/期权, 经营流水/其他]
+   占比在引擎里归一化，不要求手工凑满 100。 */
+(function (root) {
+  'use strict';
+
+  var CITIES = {
+    sh: { id: 'sh', name: '上海', min: 7546, max: 37731, hfMin: 2740, hfMax: 37731, hf: 0.07,
+          p: { pension: 0.08, medical: 0.02, unemp: 0.005 },
+          e: { pension: 0.16, medical: 0.09, unemp: 0.005, injury: 0.0026 },
+          self: { pension: 0.20, medical: 0.10 }, medicalExtra: 0 },
+    bj: { id: 'bj', name: '北京', min: 7270, max: 36348, hfMin: 2540, hfMax: 36348, hf: 0.12,
+          p: { pension: 0.08, medical: 0.02, unemp: 0.005 },
+          e: { pension: 0.16, medical: 0.098, unemp: 0.005, injury: 0.004 },
+          self: { pension: 0.20, medical: 0.09 }, medicalExtra: 3 },
+    sz: { id: 'sz', name: '深圳', min: 5521, max: 27603, hfMin: 2360, hfMax: 41190, hf: 0.05,
+          p: { pension: 0.08, medical: 0.02, unemp: 0.002 },
+          e: { pension: 0.15, medical: 0.052, unemp: 0.008, injury: 0.002 },
+          self: { pension: 0.20, medical: 0.08 }, medicalExtra: 0 },
+    gz: { id: 'gz', name: '广州', min: 5521, max: 27603, hfMin: 2680, hfMax: 39579, hf: 0.05,
+          p: { pension: 0.08, medical: 0.02, unemp: 0.002 },
+          e: { pension: 0.16, medical: 0.0685, unemp: 0.008, injury: 0.004 },
+          self: { pension: 0.20, medical: 0.085 }, medicalExtra: 0 },
+    hz: { id: 'hz', name: '杭州', min: 5122, max: 25611, hfMin: 2490, hfMax: 25611, hf: 0.12,
+          p: { pension: 0.08, medical: 0.02, unemp: 0.005 },
+          e: { pension: 0.15, medical: 0.095, unemp: 0.005, injury: 0.0072 },
+          self: { pension: 0.20, medical: 0.095 }, medicalExtra: 0 },
+    cd: { id: 'cd', name: '成都', min: 4699, max: 23493, hfMin: 2100, hfMax: 29353, hf: 0.06,
+          p: { pension: 0.08, medical: 0.02, unemp: 0.004 },
+          e: { pension: 0.16, medical: 0.0755, unemp: 0.006, injury: 0.0016 },
+          self: { pension: 0.20, medical: 0.075 }, medicalExtra: 0 }
+  };
+
+  var GROUPS = [
+    { id: 'gov',    name: '体制内',   icon: '🏛️', hint: '财政发薪 · 职业年金 · 高公积金' },
+    { id: 'soe',    name: '国企',     icon: '🏢', hint: '工资总额管理 · 企业年金' },
+    { id: 'private',name: '民企',     icon: '🏭', hint: '合同工 / 提成 / 计件 / 非全日制' },
+    { id: 'dispatch',name:'派遣与外包',icon: '🔁', hint: '劳动关系与用工单位分离' },
+    { id: 'bigtech',name: '大厂金融外企', icon: '🚀', hint: '高薪 · 股权 · 封顶缴费' },
+    { id: 'platform',name:'平台与灵活就业', icon: '🛵', hint: '自缴社保 · 经营所得 · 平台抽成' },
+    { id: 'nonstd', name: '非标与特殊', icon: '🧰', hint: '口头协议 · 日结 · 退休 / 实习' }
+  ];
+
+  var CASES = [
+    /* ───────── 体制内 ───────── */
+    {
+      id: 'gov-civil', group: 'gov', name: '公务员', icon: '🏛️',
+      legal: '公务员法 · 非劳动合同',
+      gross: 12000, lo: 8000, hi: 15000,
+      comp: [30, 10, 20, 0, 30, 0, 10],
+      si: { mode: 'full', fund: 0.12, annuity: { p: 4, u: 8 } },
+      tax: { type: 'wage', bonus: 'separate' },
+      tag: '财政足额缴费',
+      note: '基本工资占比很低，津补贴和年终绩效占大头；职业年金（个人 4% + 单位 8%）是编制内最容易被忽略的一块；公积金 12% 在上海 = 7% 基本 + 5% 补充。',
+      caveat: '各地阳光工资标准差异大，此处取二线以上城市科员口径。'
+    },
+    {
+      id: 'gov-teacher', group: 'gov', name: '事业编教师', icon: '📚',
+      legal: '事业单位聘用合同',
+      gross: 11000, lo: 8000, hi: 18000,
+      comp: [32, 40, 5, 0, 18, 0, 5],
+      si: { mode: 'full', fund: 0.12, annuity: { p: 4, u: 8 } },
+      tax: { type: 'wage', bonus: 'separate' },
+      tag: '绩效占四成',
+      note: '绩效工资与升学率/课时挂钩，寒暑假只发基本工资；公积金按 12% 双边缴（其中 5% 是补充公积金），实际是隐性收入。',
+      caveat: '义务教育教师平均工资不低于公务员是政策目标，落地程度因地而异。'
+    },
+    {
+      id: 'gov-doctor', group: 'gov', name: '公立医院编制医生', icon: '🩺',
+      legal: '事业单位聘用合同',
+      gross: 20000, lo: 15000, hi: 30000,
+      comp: [25, 50, 8, 0, 12, 0, 5],
+      si: { mode: 'full', fund: 0.12, annuity: { p: 4, u: 8 } },
+      tax: { type: 'wage', bonus: 'separate' },
+      tag: '绩效占一半',
+      note: '基本工资低、绩效高，夜班费和科室二次分配常以现金/绩效形式发放；编制内外同岗不同酬；公积金 12% = 7% 基本 + 5% 补充。',
+      caveat: '灰色收入不在统计内，也不应计入合法劳动收入。'
+    },
+    {
+      id: 'gov-army', group: 'gov', name: '军队文职', icon: '🎖️',
+      legal: '军队聘用合同',
+      gross: 14000, lo: 10000, hi: 18000,
+      comp: [45, 30, 5, 0, 15, 0, 5],
+      si: { mode: 'full', fund: 0.12, annuity: { p: 4, u: 8 } },
+      tax: { type: 'wage', bonus: 'separate' },
+      tag: '军队保障',
+      note: '工资结构里基本工资和军队服务津贴占比高，吃住医疗由军队保障，现金开支低；公积金按 7% + 5% 补充缴。',
+      caveat: '涉密岗位补贴不公开，此处不含特殊津贴。'
+    },
+    {
+      id: 'gov-social', group: 'gov', name: '社工 / 网格员', icon: '🧑‍💼',
+      legal: '劳动合同（政府购买服务）',
+      gross: 6000, lo: 5000, hi: 8000,
+      comp: [75, 15, 0, 0, 10, 0, 0],
+      si: { mode: 'min', fund: 0.05 },
+      tax: { type: 'wage', bonus: 'separate' },
+      tag: '常按最低基数缴',
+      note: '财政购买服务岗位，工资由街道/第三方发放，社保常按最低基数缴，公积金 5%。',
+      caveat: '各地“三岗十八级”薪酬体系不同，此处取中位数；6000 低于上海缴费下限 7546，单位按下限缴，成本倍数反而升到约 1.68×。'
+    },
+
+    /* ───────── 国企 ───────── */
+    {
+      id: 'soe-regular', group: 'soe', name: '国企正式工', icon: '🏢',
+      legal: '劳动合同 · 工资总额管理',
+      gross: 15000, lo: 10000, hi: 25000,
+      comp: [55, 25, 12, 0, 8, 0, 0],
+      si: { mode: 'full', fund: 0.12, annuity: { p: 4, u: 8 } },
+      tax: { type: 'wage', bonus: 'separate' },
+      tag: '企业年金 + 12% 公积金',
+      note: '工资总额受国资委管控，年终奖与效益挂钩；企业年金（个人 4% + 单位 8%）和补充医疗是隐形福利。',
+      caveat: '垄断型央企与竞争型国企差距极大，此处取中位。'
+    },
+    {
+      id: 'soe-dispatch', group: 'soe', name: '国企劳务派遣', icon: '🧷',
+      legal: '派遣劳动合同',
+      gross: 6500, lo: 5000, hi: 8000,
+      comp: [78, 15, 0, 0, 7, 0, 0],
+      si: { mode: 'min', fund: 0.05, agency: { label: '派遣管理费', pct: 0.12 } },
+      tax: { type: 'wage', bonus: 'separate' },
+      tag: '同工不同酬',
+      note: '干同样的活，工资走派遣公司、社保按最低基数，年终奖和年金基本没有；用工单位另付约 12% 管理费。',
+      caveat: '派遣用工比例不得超过 10%，实操中超比例普遍；6500 接近缴费下限，按下限缴后单位成本倍数为 1.77×。'
+    },
+
+    /* ───────── 民企 ───────── */
+    {
+      id: 'private-regular', group: 'private', name: '民企合同工', icon: '🏭',
+      legal: '劳动合同',
+      gross: 10000, lo: 6000, hi: 15000,
+      comp: [68, 20, 8, 0, 4, 0, 0],
+      si: { mode: 'min', fund: 0.05 },
+      tax: { type: 'wage', bonus: 'separate' },
+      tag: '按最低基数缴社保',
+      note: '最常见的一档：合同齐全，但社保按最低基数缴、公积金 5%，当期现金多、养老账户少。',
+      caveat: '“按最低基数”是常见做法而非合规做法，员工可投诉补缴。'
+    },
+    {
+      id: 'sales', group: 'private', name: '销售 / 提成制', icon: '📈',
+      legal: '劳动合同 · 底薪 + 提成',
+      gross: 15000, lo: 8000, hi: 30000,
+      comp: [35, 55, 0, 0, 10, 0, 0],
+      si: { mode: 'min', fund: 0.05 },
+      tax: { type: 'wage', bonus: 'separate' },
+      tag: '收入波动最大',
+      note: '底薪只够最低工资，提成按月/按季发，离职时未回款提成常被扣回；社保仍按底薪基数。',
+      caveat: '提成制度差异极大，此处按“底薪 35% + 提成 55%”建模；15000 取区间中位偏低（中位约 19000）。'
+    },
+    {
+      id: 'factory', group: 'private', name: '制造业计件工', icon: '⚙️',
+      legal: '劳动合同 · 底薪 + 计件',
+      gross: 7500, lo: 6000, hi: 9000,
+      comp: [30, 48, 0, 17, 5, 0, 0],
+      si: { mode: 'min', fund: 0.05 },
+      tax: { type: 'wage', bonus: 'separate' },
+      tag: '加班费占 17%',
+      note: '旺季靠加班把工资拉到 8k+，加班费按 1.5/2/3 倍算；社保按最低基数，工伤风险最高。',
+      caveat: '“底薪+计件”常被用来压低加班费基数，属常见争议点。'
+    },
+    {
+      id: 'parttime-hourly', group: 'private', name: '非全日制小时工', icon: '⏱️',
+      legal: '非全日制劳动合同',
+      gross: 4500, lo: 3000, hi: 6000,
+      comp: [95, 0, 0, 0, 5, 0, 0],
+      si: { mode: 'injury', fund: 0 },
+      tax: { type: 'wage', bonus: 'separate' },
+      tag: '单位只缴工伤',
+      note: '每天不超过 4 小时、每周不超过 24 小时；单位只需缴工伤保险，养老医疗由个人以灵活就业身份自缴。',
+      caveat: '超时使用即构成事实全日制，可主张补缴；图中只画单位缴工伤，个人养老医疗需以灵活就业身份自缴（未计入）。'
+    },
+
+    /* ───────── 派遣与外包 ───────── */
+    {
+      id: 'dispatch', group: 'dispatch', name: '劳务派遣', icon: '🔁',
+      legal: '派遣劳动合同 · 用人不养人',
+      gross: 7000, lo: 5000, hi: 9000,
+      comp: [75, 18, 0, 0, 7, 0, 0],
+      si: { mode: 'min', fund: 0.05, agency: { label: '派遣管理费', pct: 0.12 } },
+      tax: { type: 'wage', bonus: 'separate' },
+      tag: '社保由派遣公司缴',
+      note: '劳动合同跟派遣公司签、活在大厂干；社保按最低基数，甲方实际支付 = 工资 + 社保 + 约 12% 管理费。',
+      caveat: '“假外包真派遣”是常见规避手法，2025 年起多地专项清理；7000 低于上海下限，按下限缴，成本倍数 1.73×。'
+    },
+    {
+      id: 'outsource-onsite', group: 'dispatch', name: '人力外包（驻场）', icon: '🪑',
+      legal: '外包公司劳动合同 · 驻场服务',
+      gross: 9000, lo: 7000, hi: 12000,
+      comp: [85, 10, 0, 0, 5, 0, 0],
+      si: { mode: 'min', fund: 0.05, agency: { label: '外包服务费', pct: 0.20 } },
+      tax: { type: 'wage', bonus: 'separate' },
+      tag: '甲方成本约 1.7–2.1 倍',
+      note: '你拿 9k，甲方按 1.2–1.4 万人天付给外包公司；中间差价是外包公司的毛利，不是你的社保。',
+      caveat: '驻场外包与派遣的法律边界在“谁指挥管理”，实务中常混同。'
+    },
+    {
+      id: 'outsource-biz', group: 'dispatch', name: '业务外包 / 个体户', icon: '🧾',
+      legal: '承揽合同 · 个体户/个独',
+      gross: 12000, lo: 8000, hi: 20000,
+      comp: [0, 0, 0, 0, 0, 0, 100],
+      si: { mode: 'self', fund: 0 },
+      tax: { type: 'business', mode: 'audit', costRatio: 0.20, half: true },
+      tag: '经营所得 · 自缴社保',
+      note: '把劳动关系转成承揽关系：没有最低工资、没有加班费、没有失业保险，社保全部自掏；但可开票、可抵扣成本。',
+      caveat: '“个体户”被平台/公司用来规避社保，2025 年起多地按实质重于形式认定劳动关系。'
+    },
+    {
+      id: 'gig-platform', group: 'dispatch', name: '灵活用工平台', icon: '📱',
+      legal: '承揽 + 委托代征',
+      gross: 10000, lo: 5000, hi: 15000,
+      comp: [0, 0, 0, 0, 0, 0, 100],
+      si: { mode: 'none', fund: 0, agency: { label: '平台服务费', pct: 0.03, pay: 'worker' } },
+      tax: { type: 'business', mode: 'deemed', deemedRate: 0.015 },
+      tag: '核定征收 1.5%',
+      note: '平台代发报酬并代征个税，通常按经营所得核定 1%–1.5%；平台不缴社保、个人多也不缴（合规做法是按灵活就业自缴）。',
+      caveat: '核定征收政策正在收紧，部分园区已取消。'
+    },
+
+    /* ───────── 大厂 / 金融 / 外企 ───────── */
+    {
+      id: 'bigtech', group: 'bigtech', name: '互联网大厂', icon: '🚀',
+      legal: '劳动合同 · base + 绩效 + 股票',
+      gross: 40000, lo: 25000, hi: 60000,
+      comp: [70, 8, 12, 0, 5, 5, 0],
+      si: { mode: 'full', fund: 0.12 },
+      tax: { type: 'wage', bonus: 'separate' },
+      tag: '股权单独计税',
+      note: '月薪只是零花钱，年终奖 3–6 个月、RSU 分四年归属；股权激励单独计税（不并入综合所得），实际税负常低于工资；公积金 12% = 7% 基本 + 5% 补充（上海）。',
+      caveat: '股票按归属日公允价值计税，股价下跌也要按归属日缴税；年终奖单独计税在 3.6 万 / 14.4 万 / 30 万处有“多发一元、多缴几千”的断崖。'
+    },
+    {
+      id: 'finance', group: 'bigtech', name: '金融机构', icon: '💹',
+      legal: '劳动合同 · 高绩效占比',
+      gross: 35000, lo: 20000, hi: 80000,
+      comp: [45, 45, 0, 0, 10, 0, 0],
+      si: { mode: 'full', fund: 0.12 },
+      tax: { type: 'wage', bonus: 'separate' },
+      tag: '递延奖金',
+      note: '绩效占近一半，奖金常分 3 年递延发放（风险准备金），离职可能被追索；社保公积金按封顶基数缴。',
+      caveat: '限薪令下高管薪酬结构差异大，此处取业务岗中位偏低（区间中位约 5 万，不含高管）。'
+    },
+    {
+      id: 'foreign', group: 'bigtech', name: '外企', icon: '🌐',
+      legal: '劳动合同 · 13 薪',
+      gross: 25000, lo: 15000, hi: 40000,
+      comp: [85, 0, 12, 0, 3, 0, 0],
+      si: { mode: 'full', fund: 0.12 },
+      tax: { type: 'wage', bonus: 'separate' },
+      tag: '12% 公积金 + 商保',
+      note: '结构简单：12 个月 + 13 薪，公积金按 12% 双边缴，补充商业保险覆盖家属；裁员赔偿通常按 N+1 足额。',
+      caveat: '外企在华收缩时整条业务线裁撤，稳定性不如从前。'
+    },
+    {
+      id: 'lawfirm', group: 'bigtech', name: '律所 / 会计所', icon: '⚖️',
+      legal: '劳动合同或提成合伙',
+      gross: 15000, lo: 8000, hi: 20000,
+      comp: [80, 20, 0, 0, 0, 0, 0],
+      si: { mode: 'full', fund: 0.05 },
+      tax: { type: 'wage', bonus: 'separate' },
+      tag: '授薪律师口径',
+      note: '授薪律师拿固定工资 + 案源提成，合伙人按经营所得；助理阶段工资低、加班极多。',
+      caveat: '合伙人/提成律师不适用本卡，应按经营所得建模。'
+    },
+
+    /* ───────── 平台 / 灵活就业 ───────── */
+    {
+      id: 'freelance', group: 'platform', name: '自由设计师', icon: '🎨',
+      legal: '劳务 / 承揽 · 无单位',
+      gross: 20000, lo: 8000, hi: 25000,
+      comp: [0, 0, 0, 0, 0, 0, 100],
+      si: { mode: 'self', fund: 0 },
+      tax: { type: 'service' },
+      tag: '劳务报酬 · 预扣 20%–40%',
+      note: '按次结算，付款方预扣 20%–40%，年度汇算按 80% 并入综合所得，多数人能退税；社保全部自缴。',
+      caveat: '预扣税率远高于最终税负，现金流压力被低估；20000 略高于区间中位（约 16500）。'
+    },
+    {
+      id: 'rider', group: 'platform', name: '众包骑手', icon: '🛵',
+      legal: '承揽 · 无劳动关系',
+      gross: 9000, lo: 7000, hi: 12000,
+      comp: [0, 0, 0, 0, 0, 0, 100],
+      si: { mode: 'none', fund: 0, agency: { label: '平台服务费', pct: 0.04, pay: 'worker' } },
+      tax: { type: 'business', mode: 'deemed', deemedRate: 0.015 },
+      tag: '无社保 · 职业伤害保障',
+      note: '按单计价，平台抽成 4% 左右并代征 1.5% 个税；2026 年起职业伤害保障全国推开，按单缴费、平台承担。',
+      caveat: '“众包”不是劳动关系，没有工伤、没有最低工资、没有带薪假。'
+    },
+    {
+      id: 'driver', group: 'platform', name: '网约车司机', icon: '🚗',
+      legal: '承揽 · 带车加盟',
+      gross: 15000, lo: 10000, hi: 18000,
+      comp: [0, 0, 0, 0, 0, 0, 100],
+      si: { mode: 'none', fund: 0, agency: { label: '平台抽成', pct: 0.25, pay: 'worker', extra: { label: '车辆成本', pct: 0.20 } } },
+      tax: { type: 'business', mode: 'audit', costRatio: 0.45, half: true },
+      tag: '平台抽成 25% + 车耗',
+      note: '流水 1.5 万，平台先抽 25%，油/电/保养/保险再吃掉 20%，剩下才是自己的“工资”，还要自缴社保。',
+      caveat: '各地抽成 18%–30%，特惠快车抽成更高；自缴社保者需另扣约 2264 元/月（灵活就业最低基数），图中未计。'
+    },
+    {
+      id: 'streamer', group: 'platform', name: '主播 / MCN', icon: '🎙️',
+      legal: '劳动 / 合作 / 个体户',
+      gross: 30000, lo: 3000, hi: 50000,
+      comp: [0, 0, 0, 0, 0, 0, 100],
+      si: { mode: 'min', fund: 0, agency: { label: 'MCN 分成', pct: 0.50, pay: 'worker' } },
+      tax: { type: 'wage', bonus: 'separate' },
+      tag: 'MCN 抽走一半',
+      note: '打赏/坑位费先被 MCN 五五分成，再按工资薪金或劳务报酬缴税；头部与尾部收入差三个数量级；此处按劳动合同签约（缴最低社保）建模，合作/承揽则无社保。',
+      caveat: '签约形式决定税目，合作/个体户按经营所得，税负差异大。'
+    },
+    {
+      id: 'nanny', group: 'platform', name: '家政 / 月嫂', icon: '🧹',
+      legal: '中介制 · 无劳动合同',
+      gross: 12000, lo: 6000, hi: 25000,
+      comp: [0, 0, 0, 0, 0, 0, 100],
+      si: { mode: 'none', fund: 0, agency: { label: '中介费', pct: 0.08, pay: 'worker' } },
+      tax: { type: 'none' },
+      tag: '现金结算 · 不申报',
+      note: '住家月嫂 1.2 万–2.5 万（此处取 1.2 万偏低），现金/微信结算，几乎不缴个税和社保；员工制家政公司才会缴。',
+      caveat: '不申报是普遍做法但不合规，且无工伤保障；中介费通常首月一次性，图中按月摊薄处理。'
+    },
+
+    /* ───────── 非标 / 特殊 ───────── */
+    {
+      id: 'daylabor', group: 'nonstd', name: '口头协议 / 日结零工', icon: '🧰',
+      legal: '无合同 · 口头约定',
+      gross: 6000, lo: 3000, hi: 8000,
+      comp: [0, 0, 0, 0, 0, 0, 100],
+      si: { mode: 'none', fund: 0 },
+      tax: { type: 'none' },
+      tag: '无社保 · 无个税',
+      note: '工地小工、搬运、临时促销：日结 150–400 元，微信转账，无合同无社保无个税，欠薪几乎无法维权。',
+      caveat: '制度上应按劳务报酬申报，实际几乎无人申报；现金结算，无合同、无社保。'
+    },
+    {
+      id: 'construction', group: 'nonstd', name: '建筑大工 / 包工头', icon: '👷',
+      legal: '劳务承揽 · 包工头带队',
+      gross: 9600, lo: 6000, hi: 12000,
+      comp: [0, 0, 0, 0, 0, 0, 100],
+      si: { mode: 'project', fund: 0, agency: { label: '包工头抽成', pct: 0.05, pay: 'worker' } },
+      tax: { type: 'none' },
+      tag: '按项目参保 · 常见未申报',
+      note: '大工 400 元/天 × 24 天，包工头抽 5%；总包按项目缴工伤保险，养老医疗基本没有。',
+      caveat: '实名制平台在推进，但工资专户覆盖率仍不高；按项目参保只解决工伤，个税制度上仍应代扣，图中按“普遍未申报”建模。'
+    },
+    {
+      id: 'retired', group: 'nonstd', name: '退休返聘', icon: '🧓',
+      legal: '劳务 / 特殊劳动关系',
+      gross: 8000, lo: 5000, hi: 15000,
+      comp: [100, 0, 0, 0, 0, 0, 0],
+      si: { mode: 'none', fund: 0 },
+      tax: { type: 'wage', bonus: 'separate' },
+      tag: '养老金 + 返聘工资',
+      note: '已领养老金，返聘不缴社保；收入按工资薪金或劳务报酬缴税，等于“双份收入、单份社保”。',
+      caveat: '各地对返聘关系认定不一，工伤保障弱。'
+    },
+    {
+      id: 'intern', group: 'nonstd', name: '实习生', icon: '🎓',
+      legal: '实习协议 · 非劳动关系',
+      gross: 4000, lo: 3000, hi: 6000,
+      comp: [100, 0, 0, 0, 0, 0, 0],
+      si: { mode: 'none', fund: 0 },
+      tax: { type: 'intern' },
+      tag: '劳务报酬 · 可累计预扣',
+      note: '实习津贴按劳务报酬预扣，但 2020 年起可选择累计预扣法，月入 4k 基本不缴税；无社保。',
+      caveat: '“实习”不能替代劳动关系，毕业前才是实习生。'
+    },
+    {
+      id: 'sidegig', group: 'nonstd', name: '兼职 / 副业', icon: '🌙',
+      legal: '劳务 · 本职之外',
+      gross: 3000, lo: 1000, hi: 10000,
+      comp: [0, 0, 0, 0, 0, 0, 100],
+      si: { mode: 'none', fund: 0 },
+      tax: { type: 'service' },
+      tag: '800 元起征是误读',
+      note: '兼职收入按劳务报酬预扣：800 元以内不预扣，超过按 20% 起；年度汇算并入综合所得，多退少补。',
+      caveat: '“800 元免税”是误读，800 只是预扣门槛；3000 取常见兼职水平，低于区间中位（约 5500）。'
+    },
+    {
+      id: 'remote', group: 'nonstd', name: '跨境远程 / 数字游民', icon: '🌍',
+      legal: '承揽 · 美元结算',
+      gross: 25000, lo: 10000, hi: 50000,
+      comp: [0, 0, 0, 0, 0, 0, 100],
+      si: { mode: 'self', fund: 0 },
+      tax: { type: 'business', mode: 'audit', costRatio: 0.10, half: true },
+      tag: '结汇 + 经营所得',
+      note: '收美元、结汇到境内账户，按劳务或经营所得申报；无单位缴社保，需自己以灵活就业身份缴。',
+      caveat: '跨境收入涉外汇管理与增值税，此处只算个税与社保。'
+    }
+  ];
+
+  /* 第 7 槽的语义随案例变化：不是所有「其他」都是经营所得 */
+  var SLOT7 = {
+    'streamer': '直播流水', 'rider': '订单流水', 'driver': '订单流水',
+    'gig-platform': '平台订单流水', 'construction': '日结工资', 'daylabor': '日结工资',
+    'nanny': '服务收入', 'remote': '跨境收入', 'gov-civil': '改革性补贴'
+  };
+  CASES.forEach(function (c) {
+    var t = (c.tax && c.tax.type) || 'wage';
+    var label = SLOT7[c.id] || (t === 'business' ? '经营流水'
+      : t === 'service' ? '劳务收入'
+        : t === 'none' ? '现金收入' : '其他收入');
+    if (c.group === 'gov' && !SLOT7[c.id]) label = '其他补贴';
+    c.compLabels = Object.assign({ 6: label }, c.compLabels || {});
+  });
+
+  /* 收入构成的显示名与配色 */
+  var COMP_LABELS = ['基本工资', '绩效工资', '年终奖', '加班费', '津贴补贴', '股权 / 期权', '其他收入'];
+  var COMP_COLORS = ['#2563eb', '#3b82c4', '#0ea5e9', '#6366f1', '#0891b2', '#7c3aed', '#d4a017'];
+
+  root.LABOR_DATA = {
+    cities: CITIES,
+    groups: GROUPS,
+    cases: CASES,
+    compLabels: COMP_LABELS,
+    compColors: COMP_COLORS,
+    meta: {
+      year: '2026 社保年度',
+      taxYear: '2026 年度',
+      updated: '2026-11-20',
+      sources: [
+        { label: '个税税率表 · 累计预扣法', url: 'http://www.gov.cn/gongbao/content/2019/content_5386991.htm' },
+        { label: '专项附加扣除（国发〔2023〕13号）', url: 'https://www.gov.cn/zhengce/content/202308/content_6900595.htm' },
+        { label: '年终奖单独计税（2023年第30号）', url: 'https://www.chinatax.gov.cn/chinatax/n810341/n810755/c5212561/content.html' },
+        { label: '上海社保基数（2026 年度）', url: 'https://rsj.sh.gov.cn/tgsgg_17341/20260818/t0035_1443203.html' },
+        { label: '上海公积金基数（2026-07 起）', url: 'https://www.shzfgjj.cn/html/newxxgk/zcwj/gfxwj/228478.html' },
+        { label: '上海医保费率（沪医保规〔2026〕2号）', url: 'https://ybj.sh.gov.cn/gfxwj/20260313/921e047144694b61b6df8ca0c5ef2cfc.html' }
+      ]
+    }
+  };
+})(window);
+
+</script>
+<script>
+/* 劳动收入组成 · 计算引擎
+   金额单位：元 / 月；年度税额算完再除以 12。
+   口径：
+   - 工资薪金：年度综合所得，年终奖默认单独计税（政策至 2027-12-31）
+   - 劳务报酬：展示「预扣」，并在 stats 里给年度汇算后的终税与可退金额
+   - 经营所得：5 级超额累进，个体户 ≤200 万部分减半（至 2027-12-31）
+   - 平台抽成 / MCN 分成 / 包工头抽成：发生在「流水」层面，先扣再形成个人应发 */
+(function (root) {
+  'use strict';
+
+  var D = root.LABOR_DATA;
+  if (!D) throw new Error('data.js 必须先加载');
+
+  var WAGE_TABLE = [
+    { cap: 36000, rate: 0.03, quick: 0 },
+    { cap: 144000, rate: 0.10, quick: 2520 },
+    { cap: 300000, rate: 0.20, quick: 16920 },
+    { cap: 420000, rate: 0.25, quick: 31920 },
+    { cap: 660000, rate: 0.30, quick: 52920 },
+    { cap: 960000, rate: 0.35, quick: 85920 },
+    { cap: Infinity, rate: 0.45, quick: 181920 }
+  ];
+  var BONUS_TABLE = [
+    { cap: 3000, rate: 0.03, quick: 0 },
+    { cap: 12000, rate: 0.10, quick: 210 },
+    { cap: 25000, rate: 0.20, quick: 1410 },
+    { cap: 35000, rate: 0.25, quick: 2660 },
+    { cap: 55000, rate: 0.30, quick: 4410 },
+    { cap: 80000, rate: 0.35, quick: 7160 },
+    { cap: Infinity, rate: 0.45, quick: 15160 }
+  ];
+  var BIZ_TABLE = [
+    { cap: 30000, rate: 0.05, quick: 0 },
+    { cap: 90000, rate: 0.10, quick: 1500 },
+    { cap: 300000, rate: 0.20, quick: 10500 },
+    { cap: 500000, rate: 0.30, quick: 40500 },
+    { cap: Infinity, rate: 0.35, quick: 65500 }
+  ];
+  var SERVICE_TABLE = [
+    { cap: 20000, rate: 0.20, quick: 0 },
+    { cap: 50000, rate: 0.30, quick: 2000 },
+    { cap: Infinity, rate: 0.40, quick: 7000 }
+  ];
+
+  function bracket(t, x) { for (var i = 0; i < t.length; i++) if (x <= t[i].cap) return t[i]; return t[t.length - 1]; }
+  function taxOf(t, x) { if (!(x > 0)) return 0; var b = bracket(t, x); return Math.max(0, x * b.rate - b.quick); }
+  function clamp(v, a, b) { return Math.min(b, Math.max(a, v)); }
+  function norm(comp) {
+    var s = comp.reduce(function (a, b) { return a + (b || 0); }, 0) || 1;
+    return comp.map(function (v) { return (v || 0) / s; });
+  }
+
+  function compute(c, o) {
+    o = o || {};
+    var city = D.cities[o.city] || D.cities.sh;
+    var revenue = Math.max(0, o.gross == null ? c.gross : +o.gross);   // 流水 / 应发
+    var shares = norm(c.comp);
+    var comps = shares.map(function (s, i) {
+      return { i: i, label: (c.compLabels && c.compLabels[i]) || D.compLabels[i], value: revenue * s, share: s };   // 月额
+    });
+    var bonusAnnual = comps[2].value * 12;
+    var equityAnnual = comps[5].value * 12;
+    var bonusMethod = o.bonusMethod || (c.tax && c.tax.bonus) || 'separate';
+    var deductionsMonthly = o.deductions == null ? 3000 : +o.deductions;
+
+    /* ---------- 先扣平台 / 中介 / 包工头 ---------- */
+    var ag = (c.si && c.si.agency) || null;
+    var agPay = (ag && ag.pay) || 'client';           // client=甲方另付；worker=从流水里扣
+    var agPct = (ag && ag.pct) || 0;
+    var exPct = (ag && ag.extra && ag.extra.pct) || 0;
+    var agencyDeduct = agPay === 'worker' ? revenue * agPct : 0;
+    var extraDeduct = agPay === 'worker' ? revenue * exPct : 0;
+    var agencyClient = agPay === 'client' ? revenue * agPct : 0;
+
+    var costRatio = (c.tax && c.tax.mode !== 'deemed' && c.tax.costRatio) || 0;
+    var extraCost = 0;
+    if (costRatio > 0) {
+      var needed = revenue * costRatio;
+      extraCost = Math.max(0, needed - agencyDeduct - extraDeduct);
+    }
+    var gross = revenue - agencyDeduct - extraDeduct - extraCost;   // 个人税前应发
+    var annual = gross * 12;
+
+    /* ---------- 社保 / 公积金 ---------- */
+    var siMode = (c.si && c.si.mode) || 'full';
+    var siBase = clamp(gross, city.min, city.max);
+    var hfRate = o.fundRate != null ? +o.fundRate : (c.si && c.si.fund != null ? c.si.fund : city.hf);
+    var hfBase = clamp(gross, city.hfMin, city.hfMax);
+    var annuityP = (c.si && c.si.annuity && c.si.annuity.p) || 0;
+    var annuityU = (c.si && c.si.annuity && c.si.annuity.u) || 0;
+
+    var pPension = 0, pMedical = 0, pUnemp = 0, pHf = 0, pAnnuity = 0;
+    var pPensionAcct = 0, pPensionPool = 0;   // 8% 入个人账户，其余进统筹
+    var ePension = 0, eMedical = 0, eUnemp = 0, eInjury = 0, eHf = 0, eAnnuity = 0;
+
+    if (siMode === 'self') {
+      siBase = city.min;                       // 灵活就业多按最低基数自缴（60% 档）
+      pPension = siBase * city.self.pension;   // 20%
+      pPensionAcct = siBase * 0.08;            // 其中 8% 入个人账户
+      pPensionPool = Math.max(0, pPension - pPensionAcct);
+      pMedical = siBase * city.self.medical;
+    } else if (siMode !== 'none') {
+      if (siMode === 'min') siBase = city.min;
+      else if (siMode === 'project') siBase = 0;
+      else siBase = clamp(gross, city.min, city.max);
+
+      if (siMode === 'full' || siMode === 'min') {
+        pPension = siBase * city.p.pension;
+        pPensionAcct = pPension;
+        pMedical = siBase * city.p.medical + (city.medicalExtra || 0);
+        pUnemp = siBase * city.p.unemp;
+        ePension = siBase * city.e.pension;
+        eMedical = siBase * city.e.medical;
+        eUnemp = siBase * city.e.unemp;
+        eInjury = siBase * city.e.injury;
+        pHf = hfBase * hfRate;
+        eHf = hfBase * hfRate;
+        pAnnuity = gross * annuityP / 100;
+        eAnnuity = gross * annuityU / 100;
+      } else if (siMode === 'injury') {
+        eInjury = siBase * city.e.injury;
+      } else if (siMode === 'project') {
+        eInjury = gross * 0.005;
+      }
+    }
+
+    var personalSi = pPension + pMedical + pUnemp;
+
+    /* ---------- 个税 ---------- */
+    var taxType = (c.tax && c.tax.type) || 'wage';
+    var withheld = 0, finalTax = 0, taxEquity = 0, taxBonus = 0, refundable = 0;
+
+    if (taxType === 'none') {
+      withheld = finalTax = 0;
+    } else if (taxType === 'service') {
+      if (gross <= 4000) withheld = Math.max(0, gross - 800) * 0.20 * 12;
+      else withheld = taxOf(SERVICE_TABLE, gross * 0.8) * 12;
+      var svcTaxable = Math.max(0, annual * 0.8 - 60000
+        - (personalSi + pHf + pAnnuity) * 12 - deductionsMonthly * 12);
+      finalTax = taxOf(WAGE_TABLE, svcTaxable);
+      refundable = Math.max(0, withheld - finalTax);
+    } else if (taxType === 'intern') {
+      withheld = taxOf(WAGE_TABLE, Math.max(0, annual - 60000 - deductionsMonthly * 12));
+      finalTax = withheld;
+    } else if (taxType === 'business') {
+      if (c.tax.mode === 'deemed') {
+        withheld = annual * (c.tax.deemedRate || 0.015);
+      } else {
+        var bizTaxable = Math.max(0, annual - 60000
+          - (personalSi + pHf + pAnnuity) * 12 - deductionsMonthly * 12);
+        var bt = taxOf(BIZ_TABLE, bizTaxable);
+        if (c.tax.half && bizTaxable <= 2000000) bt *= 0.5;
+        withheld = bt;
+      }
+      finalTax = withheld;
+    } else {
+      var comprehensive = annual - equityAnnual - (bonusMethod === 'separate' ? bonusAnnual : 0);
+      var taxable = Math.max(0, comprehensive - 60000
+        - (personalSi + pHf + pAnnuity) * 12 - deductionsMonthly * 12);
+      var taxWage = taxOf(WAGE_TABLE, taxable);
+      if (bonusMethod === 'separate' && bonusAnnual > 0) {
+        var bb = bracket(BONUS_TABLE, bonusAnnual / 12);
+        taxBonus = Math.max(0, bonusAnnual * bb.rate - bb.quick);
+      }
+      taxEquity = taxOf(WAGE_TABLE, equityAnnual);
+      withheld = taxWage + taxBonus + taxEquity;
+      finalTax = withheld;
+    }
+
+    /* ---------- 闭合与统计 ---------- */
+    var withheldMonthly = withheld / 12;            // 上面算的是年税
+    var net = gross - personalSi - pHf - pAnnuity - withheldMonthly;
+    var employerSi = ePension + eMedical + eUnemp + eInjury;
+    var cost = gross + employerSi + eHf + eAnnuity + agencyClient;  // 用工总成本
+    var topLine = revenue;
+    var hfMonthly = pHf + eHf;
+    var annuityMonthly = pAnnuity + eAnnuity;
+
+    var stats = {
+      cashRate: gross > 0 ? net / gross : 0,
+      costRate: cost > 0 ? net / cost : 0,
+      fullRate: cost > 0 ? (net + hfMonthly + annuityMonthly) / cost : 0,
+      taxRate: gross > 0 ? finalTax / annual : 0,
+      takeRate: revenue > 0 ? net / revenue : 0,
+      multiple: net > 0 ? (agPay === 'worker' ? revenue : cost) / net : 0,
+      wedge: gross > 0 ? 1 - net / gross : 0
+    };
+
+    return {
+      caseId: c.id, city: city, gross: gross, revenue: revenue, annual: annual, agPay: agPay, agPay: agPay,
+      comps: comps, bonusAnnual: bonusAnnual, equityAnnual: equityAnnual,
+      bonusMethod: bonusMethod, deductionsMonthly: deductionsMonthly,
+      siMode: siMode, siBase: siBase, hfRate: hfRate, hfBase: hfBase,
+      p: { pension: pPension, pensionAcct: pPensionAcct, pensionPool: pPensionPool,
+           medical: pMedical, unemp: pUnemp, hf: pHf, annuity: pAnnuity, si: personalSi, tax: withheldMonthly },
+      er: { pension: ePension, medical: eMedical, unemp: eUnemp, injury: eInjury, hf: eHf, annuity: eAnnuity,
+            si: employerSi, agency: agencyClient, agencyDeduct: agencyDeduct, extra: extraDeduct + extraCost },
+      extraCost: extraCost,
+      hfMonthly: hfMonthly, annuityMonthly: annuityMonthly,
+      tax: { withheld: withheldMonthly, annual: withheld, final: finalTax, finalMonthly: finalTax / 12,
+             refundable: refundable, equity: taxEquity, bonus: taxBonus, kind: taxType },
+      net: net, cost: cost, topLine: topLine,
+      stats: stats
+    };
+  }
+
+  root.LaborEngine = { compute: compute, tables: { WAGE_TABLE: WAGE_TABLE, BONUS_TABLE: BONUS_TABLE, BIZ_TABLE: BIZ_TABLE } };
+})(window);
+
+</script>
+<script>
+/* 劳动收入组成 · 桑基图渲染器（原生 SVG，零依赖）
+   用法：LaborSankey.render(svgEl, graph, { height, tip, onHover })
+   graph = { nodes:[{id,label,value,layer,color,order,note}], links:[{source,target,value}] } */
+(function (root) {
+  'use strict';
+
+  var NS = 'http://www.w3.org/2000/svg';
+  var NODE_W = 22, GAP = 14, LABEL_H = 32, LABEL_GAP = 13;
+  var state = { svg: null, W: 0, H: 600, graph: null, nodes: [], links: [], byId: new Map(), ky: 1, tip: null, hover: null };
+  var uid = 0;
+
+  function el(tag, attrs, kids) {
+    var n = document.createElementNS(NS, tag);
+    if (attrs) for (var k in attrs) if (attrs[k] != null) n.setAttribute(k, attrs[k]);
+    if (kids) [].concat(kids).forEach(function (c) {
+      if (c == null || c === '') return;
+      n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+    });
+    return n;
+  }
+  function r2(n) { return Math.round(n * 100) / 100; }
+  function fmtMoney(n) {
+    var v = Math.round(n);
+    return '¥' + v.toLocaleString('en-US');
+  }
+  function textW(s, size) {
+    var w = 0;
+    for (var i = 0; i < s.length; i++) w += /[\u2E80-\uFFFF]/.test(s[i]) ? size : size * 0.56;
+    return w;
+  }
+
+  function pads(W) {
+    return W < 760 ? { L: 108, R: 132, T: 54, B: 30 } : { L: 148, R: 176, T: 58, B: 30 };
+  }
+
+  function layout() {
+    var W = state.W, H = state.H, nodes = state.nodes, links = state.links, byId = state.byId;
+    var P = pads(W);
+    var plotW = W - P.L - P.R;
+    var plotH = H - P.T - P.B;
+    var maxLayer = 0;
+    nodes.forEach(function (n) { if (n.layer > maxLayer) maxLayer = n.layer; });
+    var step = maxLayer > 0 ? (plotW - NODE_W) / maxLayer : 0;
+
+    var cols = new Map();
+    nodes.forEach(function (n) {
+      if (!cols.has(n.layer)) cols.set(n.layer, []);
+      cols.get(n.layer).push(n);
+    });
+    cols.forEach(function (arr) {
+      arr.sort(function (a, b) { return (a.order || 0) - (b.order || 0); });
+    });
+
+    var ky = Infinity;
+    cols.forEach(function (arr) {
+      var sum = arr.reduce(function (a, n) { return a + n.value; }, 0);
+      if (sum > 0) ky = Math.min(ky, (plotH - GAP * (arr.length - 1)) / sum);
+    });
+    if (!isFinite(ky) || ky <= 0) ky = 1;
+    state.ky = ky;
+
+    cols.forEach(function (arr, L) {
+      arr.forEach(function (n) { n.x = P.L + L * step; n.h = Math.max(2.5, n.value * ky); });
+      var colH = arr.reduce(function (a, n) { return a + n.h; }, 0) + GAP * (arr.length - 1);
+      var y = P.T + Math.max(0, (plotH - colH) / 2);
+      arr.forEach(function (n) {
+        n.y = y; n.cy = y + n.h / 2; n.cx = n.x + NODE_W / 2;
+        y += n.h + GAP;
+      });
+    });
+
+    var outs = new Map(), ins = new Map();
+    nodes.forEach(function (n) { outs.set(n.id, []); ins.set(n.id, []); });
+    links.forEach(function (l) {
+      outs.get(l.source).push(l);
+      ins.get(l.target).push(l);
+    });
+    outs.forEach(function (a) { a.sort(function (p, q) { return byId.get(p.target).cy - byId.get(q.target).cy; }); });
+    ins.forEach(function (a) { a.sort(function (p, q) { return byId.get(p.source).cy - byId.get(q.source).cy; }); });
+    outs.forEach(function (a, id) {
+      var y = byId.get(id).y;
+      a.forEach(function (l) { l.y0 = y; y += l.value * ky; });
+    });
+    ins.forEach(function (a, id) {
+      var y = byId.get(id).y;
+      a.forEach(function (l) { l.y1 = y; y += l.value * ky; });
+    });
+
+    links.forEach(function (l) {
+      l.w = Math.max(0.6, l.value * ky);
+      l.x0 = byId.get(l.source).x + NODE_W;
+      l.x1 = byId.get(l.target).x;
+      l.c = byId.get(l.source).color;
+    });
+  }
+
+  function ribbon(l) {
+    var x0 = l.x0, y0 = l.y0, x1 = l.x1, y1 = l.y1, w = l.w;
+    var k = Math.max(6, (x1 - x0) * 0.45);
+    return 'M' + r2(x0) + ',' + r2(y0) +
+      ' C' + r2(x0 + k) + ',' + r2(y0) + ' ' + r2(x1 - k) + ',' + r2(y1) + ' ' + r2(x1) + ',' + r2(y1) +
+      ' L' + r2(x1) + ',' + r2(y1 + w) +
+      ' C' + r2(x1 - k) + ',' + r2(y1 + w) + ' ' + r2(x0 + k) + ',' + r2(y0 + w) + ' ' + r2(x0) + ',' + r2(y0 + w) + ' Z';
+  }
+
+  function placeLabels(arr, h, gap) {
+    if (!arr.length) return;
+    h = h || LABEL_H; gap = gap == null ? LABEL_GAP : gap;
+    arr.sort(function (a, b) { return a.desired - b.desired; });
+    var MIN = 8, MAX = state.H - 6 - h;
+    var prev = -Infinity;
+    arr.forEach(function (it) { var hh = it.h || h; it.top = Math.max(it.desired, MIN, prev + gap + hh); prev = it.top; });
+    var lastH = arr[arr.length - 1].h || h;
+    var over = arr[arr.length - 1].top - (state.H - 6 - lastH);
+    if (over > 0) arr.forEach(function (it) { it.top -= over; });
+    prev = -Infinity;
+    arr.forEach(function (it) { var hh = it.h || h; it.top = Math.max(it.top, MIN, prev + gap + hh); prev = it.top; });
+  }
+
+  var STYLE = [
+    '.lk{fill-opacity:.4;transition:fill-opacity .18s,opacity .18s}',
+    '.lk.on{fill-opacity:.8}',
+    '.nd rect{stroke:rgba(15,23,42,.10);stroke-width:1}',
+    '.nd{cursor:pointer}',
+    '.nl,.lk,.nd{transition:opacity .18s}',
+    'svg.focusing .nd,svg.focusing .lk,svg.focusing .nl{opacity:.16}',
+    'svg.focusing .nd.on,svg.focusing .lk.on,svg.focusing .nl.on{opacity:1}',
+    '.lb-name{font:600 12.5px/1 "Segoe UI","Microsoft YaHei",system-ui,sans-serif;fill:#243044}',
+    '.lb-val{font:500 11px/1 "Segoe UI","Microsoft YaHei",system-ui,sans-serif;fill:#78859a;font-variant-numeric:tabular-nums}',
+    '.lb-name,.lb-val{paint-order:stroke;stroke:#fdfcf9;stroke-width:3.6px;stroke-linejoin:round}',
+    '.lb-name.on{fill:#0f2a4a}',
+    '.nl.compact .lb-name{font-size:11.5px}',
+    '.lead{stroke:#d7dee8;stroke-width:1;fill:none}',
+    '.colh{font:600 10.5px/1 "Segoe UI","Microsoft YaHei",system-ui,sans-serif;fill:#98a4b5;letter-spacing:.09em}',
+    '.watermark{font:700 11px/1 "Segoe UI","Microsoft YaHei",system-ui,sans-serif;fill:#b6c0cd;letter-spacing:.14em}',
+    '.enter .nd,.enter .lk,.enter .nl{animation:sin .5s cubic-bezier(.2,.7,.3,1) both}',
+    '@keyframes sin{from{opacity:0}to{opacity:1}}',
+    '@media (prefers-reduced-motion:reduce){.enter .nd,.enter .lk,.enter .nl{animation:none}}'
+  ].join('');
+
+  function render(svg, graph, opts) {
+    opts = opts || {};
+    state.svg = svg;
+    state.graph = graph;
+    state.tip = opts.tip || null;
+    state.onHover = opts.onHover || null;
+    var host = svg.parentNode;
+    state.W = Math.max(360, host.clientWidth || 900);
+    state.H = opts.height || Math.max(500, Math.min(660, state.W * 0.64));
+    svg.setAttribute('viewBox', '0 0 ' + state.W + ' ' + state.H);
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', state.H);
+
+    state.nodes = graph.nodes.map(function (n) {
+      return { id: n.id, label: n.label, value: Math.max(0, n.value), layer: n.layer, color: n.color,
+               order: n.order || 0, note: n.note, sub: n.sub, hero: n.hero, hideLabel: n.hideLabel };
+    });
+    state.byId = new Map(state.nodes.map(function (n) { return [n.id, n]; }));
+    state.links = graph.links.filter(function (l) {
+      return state.byId.has(l.source) && state.byId.has(l.target) && l.value > 0.01;
+    }).map(function (l) { return { source: l.source, target: l.target, value: l.value, note: l.note }; });
+
+    layout();
+
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    svg.setAttribute('class', 'sankey enter');
+
+    svg.appendChild(el('style', null, [STYLE]));
+    svg.appendChild(el('rect', { x: 0, y: 0, width: state.W, height: state.H, fill: '#fdfcf9' }));
+
+    var P = pads(state.W);
+    // 列标题（右端贴齐画布内边距，避免被裁）
+    var lastLayer = 0;
+    state.nodes.forEach(function (n) { if (n.layer > lastLayer) lastLayer = n.layer; });
+    var stepH = lastLayer > 0 ? (state.W - P.L - P.R - NODE_W) / lastLayer : 0;
+    (opts.columns || ['收入来源', '税前应发', '扣缴', '去向']).forEach(function (name, L) {
+      if (L > lastLayer) return;
+      var anchor = L === 0 ? 'start' : (L === lastLayer ? 'end' : 'middle');
+      var x = L === 0 ? P.L : (L === lastLayer ? state.W - 16 : P.L + L * stepH + NODE_W / 2);
+      svg.appendChild(el('text', { class: 'colh', x: r2(x), y: 26, 'text-anchor': anchor }, [name]));
+    });
+    svg.appendChild(el('line', { x1: P.L, y1: 38, x2: state.W - 16, y2: 38, stroke: '#e6e2d9', 'stroke-width': 1 }));
+
+    var gLinks = el('g'), gNodes = el('g'), gLabels = el('g');
+    svg.appendChild(gLinks); svg.appendChild(gNodes); svg.appendChild(gLabels);
+
+    // 流带
+    state.links.forEach(function (l, i) {
+      var p = el('path', { class: 'lk', d: ribbon(l), fill: l.c, 'data-kind': 'link', 'data-id': String(i) });
+      gLinks.appendChild(p);
+      l.el = p;
+    });
+
+    // 节点
+    state.nodes.forEach(function (n) {
+      var hitH = Math.max(10, n.h);
+      var hit = el('rect', { x: r2(n.x - 3), y: r2(n.cy - hitH / 2), width: NODE_W + 6, height: r2(hitH), fill: 'transparent', 'pointer-events': 'all' });
+      var rect = el('rect', { x: r2(n.x), y: r2(n.y), width: NODE_W, height: Math.max(2.5, r2(n.h)), rx: 2.5, fill: n.color });
+      var g = el('g', { class: 'nd', 'data-kind': 'node', 'data-id': n.id }, [hit, rect]);
+      if (n.hero) g.appendChild(el('rect', { x: r2(n.x - 4), y: r2(n.y - 4), width: NODE_W + 8, height: Math.max(2.5, r2(n.h)) + 8,
+        rx: 5, fill: 'none', stroke: '#16a34a', 'stroke-width': 1.2, 'stroke-opacity': .38 }));
+      gNodes.appendChild(g);
+      n.g = g;
+    });
+
+    // 标签：首列左、末列右、单节点中间列放上方、多节点中间列放右侧
+    var maxLayer = 0;
+    state.nodes.forEach(function (n) { if (n.layer > maxLayer) maxLayer = n.layer; });
+    var colSum = {}, colCount = {};
+    state.nodes.forEach(function (n) {
+      colSum[n.layer] = (colSum[n.layer] || 0) + n.value;
+      colCount[n.layer] = (colCount[n.layer] || 0) + 1;
+    });
+
+    var tiny = [];
+    var labels = state.nodes.filter(function (n) {
+      var thin = n.hideLabel || n.h < 5 || (colSum[n.layer] > 0 && n.value / colSum[n.layer] < 0.006);
+      if (thin) { tiny.push(n); return false; }
+      return true;
+    }).map(function (n) {
+      /* 两条干流的同名列统一居中放在节点上方，避免左右锚点造成「错列」错觉 */
+      var side = (n.id === 'gross' || n.id === 'er1') ? 'top'
+        : n.layer === 0 ? 'left'
+          : (n.layer === maxLayer ? 'right'
+            : (colCount[n.layer] === 1 ? 'top' : (String(n.id).charAt(0) === 'e' ? 'midL' : 'midR')));
+      return { n: n, side: side, desired: (side === 'top' ? n.y - LABEL_H - 8 : n.cy - LABEL_H / 2), top: 0 };
+    });
+
+    /* 每列挑一个「原本会被隐藏」的小额项做 callout，避免只剩漂浮色块 */
+    var callouts = new Map();
+    tiny.forEach(function (n) {
+      if (!(n.value > 0)) return;
+      var cur = callouts.get(n.layer);
+      if (!cur || n.value > cur.value) callouts.set(n.layer, n);
+    });
+    callouts.forEach(function (n) {
+      var side = n.layer === 0 ? 'left' : (n.layer === maxLayer ? 'right' : (String(n.id).charAt(0) === 'e' ? 'midL' : 'midR'));
+      labels.push({ n: n, side: side, small: true, compact: true, h: 24, desired: n.cy - 12, top: 0 });
+    });
+    var groups = new Map();
+    labels.forEach(function (L) { if (!groups.has(L.side)) groups.set(L.side, []); groups.get(L.side).push(L); });
+    var avail = state.H - 16;
+    groups.forEach(function (arr) {
+      var needSum = arr.reduce(function (a, it) { return a + (it.h || LABEL_H) + LABEL_GAP; }, 0);
+      var compact = needSum > avail;
+      arr.forEach(function (it) {
+        if (it.small) return;                       // callout 本身就是小号
+        it.compact = compact; it.h = compact ? 18 : LABEL_H;
+      });
+      placeLabels(arr, compact ? 18 : LABEL_H, compact ? 4 : LABEL_GAP);
+    });
+
+    labels.forEach(function (L) {
+      var n = L.n, mid = L.top + L.h / 2;
+      var anchor = (L.side === 'left' || L.side === 'midL') ? 'end' : (L.side === 'top' ? 'middle' : 'start');
+      var x = (L.side === 'left') ? n.x - 11
+        : (L.side === 'midL') ? n.x - 12
+          : (L.side === 'right') ? n.x + NODE_W + 11
+            : (L.side === 'midR') ? n.x + NODE_W + 13 : n.cx;
+      var kids = [];
+      if (L.side === 'left' && Math.abs(mid - n.cy) > 8) {
+        kids.push(el('path', { class: 'lead', d: 'M' + r2(n.x) + ',' + r2(n.cy) + ' L' + r2(n.x - 9) + ',' + r2(mid) }));
+      } else if (L.side === 'right' && Math.abs(mid - n.cy) > 8) {
+        kids.push(el('path', { class: 'lead', d: 'M' + r2(n.x + NODE_W) + ',' + r2(n.cy) + ' L' + r2(n.x + NODE_W + 9) + ',' + r2(mid) }));
+      } else if (L.side === 'midL' && (L.small || Math.abs(mid - n.cy) > 8)) {
+        kids.push(el('path', { class: 'lead', d: 'M' + r2(n.x - 2) + ',' + r2(n.cy) + ' L' + r2(x + 5) + ',' + r2(mid) }));
+      } else if (L.side === 'midR' && (L.small || Math.abs(mid - n.cy) > 8)) {
+        kids.push(el('path', { class: 'lead', d: 'M' + r2(n.x + NODE_W + 2) + ',' + r2(n.cy) + ' L' + r2(x - 5) + ',' + r2(mid) }));
+      } else if (L.side === 'top' && n.y - (L.top + L.h) > 8) {
+        kids.push(el('path', { class: 'lead', d: 'M' + r2(n.cx) + ',' + r2(n.y) + ' L' + r2(n.cx) + ',' + r2(L.top + L.h) }));
+      }
+      kids.push(el('text', { class: 'lb-name' + (n.hero ? ' on' : ''), x: r2(x), y: r2(L.top + (L.compact ? 13 : 12)), 'text-anchor': anchor }, [n.label]));
+      if (!L.compact) kids.push(el('text', { class: 'lb-val', x: r2(x), y: r2(L.top + 26), 'text-anchor': anchor }, [fmtMoney(n.value)]));
+      var g = el('g', { class: 'nl' + (L.compact ? ' compact' : ''), 'data-kind': 'node', 'data-id': n.id }, kids);
+      gLabels.appendChild(g);
+      n.labelEl = g;
+    });
+
+    svg.appendChild(el('text', { class: 'watermark', x: P.L, y: state.H - 6 }, ['单位：元 / 月 · 占比按列内合计']));
+
+    bind();
+  }
+
+  /* ---------- 交互 ---------- */
+  function bind() {
+    var svg = state.svg;
+    if (!svg) return;
+    svg.onmouseover = function (e) {
+      var t = e.target.closest('[data-kind]');
+      if (!t) return;
+      var kind = t.getAttribute('data-kind'), id = t.getAttribute('data-id');
+      focus(kind, id);
+      if (state.tip) state.tip(kind, id, e);
+    };
+    svg.onmousemove = function (e) { if (state.tip) state.tip.move && state.tip.move(e); };
+    svg.onmouseout = function (e) {
+      if (e.relatedTarget && svg.contains(e.relatedTarget)) return;
+      blur();
+      if (state.tip) state.tip.hide && state.tip.hide();
+    };
+    svg.onclick = function (e) {
+      var t = e.target.closest('[data-kind]');
+      if (t && state.tip && state.tip.click) state.tip.click(t.getAttribute('data-kind'), t.getAttribute('data-id'));
+    };
+  }
+
+  function focus(kind, id) {
+    var svg = state.svg;
+    svg.classList.add('focusing');
+    var keepNodes = new Set(), keepLinks = new Set();
+    if (kind === 'node') {
+      keepNodes.add(id);
+      state.links.forEach(function (l, i) {
+        if (l.source === id) { keepLinks.add(i); keepNodes.add(l.target); }
+        if (l.target === id) { keepLinks.add(i); keepNodes.add(l.source); }
+      });
+    } else {
+      var l = state.links[+id];
+      if (!l) return;
+      keepLinks.add(+id); keepNodes.add(l.source); keepNodes.add(l.target);
+      state.links.forEach(function (m, i) {
+        if (m.source === l.source && m.target === l.target) keepLinks.add(i);
+      });
+    }
+    state.nodes.forEach(function (n) {
+      var on = keepNodes.has(n.id);
+      n.g.classList.toggle('on', on);
+      if (n.labelEl) n.labelEl.classList.toggle('on', on);
+    });
+    state.links.forEach(function (m, i) { m.el.classList.toggle('on', keepLinks.has(i)); });
+  }
+  function blur() {
+    var svg = state.svg;
+    if (!svg) return;
+    svg.classList.remove('focusing');
+    state.nodes.forEach(function (n) { n.g.classList.remove('on'); if (n.labelEl) n.labelEl.classList.remove('on'); });
+    state.links.forEach(function (m) { m.el.classList.remove('on'); });
+  }
+
+  /* ---------- 导出 ---------- */
+  function svgString() {
+    var svg = state.svg.cloneNode(true);
+    svg.setAttribute('xmlns', NS);
+    svg.setAttribute('width', state.W);
+    svg.setAttribute('height', state.H);
+    svg.classList.remove('focusing');
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(svg);
+  }
+  function download(name, blob) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 400);
+  }
+  function exportSVG(name) {
+    download(name || 'labor-income.svg', new Blob([svgString()], { type: 'image/svg+xml;charset=utf-8' }));
+  }
+  function exportPNG(name, scale) {
+    scale = scale || 2;
+    var str = svgString();
+    var img = new Image();
+    var blob = new Blob([str], { type: 'image/svg+xml;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    img.onload = function () {
+      var c = document.createElement('canvas');
+      c.width = state.W * scale; c.height = state.H * scale;
+      var ctx = c.getContext('2d');
+      ctx.fillStyle = '#fdfcf9'; ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(function (b) { download(name || 'labor-income.png', b); }, 'image/png');
+    };
+    img.src = url;
+  }
+
+  root.LaborSankey = {
+    render: render, exportSVG: exportSVG, exportPNG: exportPNG,
+    focus: focus, blur: blur, fmt: fmtMoney, state: state
+  };
+})(window);
+
+</script>
+<script>
+/* 劳动收入组成 · UI 与图形组装 */
+(function (root) {
+  'use strict';
+
+  var D = root.LABOR_DATA, E = root.LaborEngine, K = root.LaborSankey;
+
+  var C = {
+    gross: '#1d55a5',
+    src: ['#2563eb', '#3b82c4', '#0ea5e9', '#6366f1', '#0891b2', '#7c3aed', '#d4a017'],
+    personal: { pension: '#0ea5e9', pool: '#9b8af0', medical: '#6366f1', unemp: '#a78bfa', hf: '#0d9488', annuity: '#0f766e', tax: '#e11d48' },
+    employer: { pension: '#b9c0cb', medical: '#c8ced8', other: '#d5dae2', hf: '#9aa6b2', annuity: '#aab4c0', agency: '#d9a45b' },
+    sink: { net: '#16a34a', acct: '#0ea5e9', hf: '#0d9488', annuity: '#0f766e', social: '#7c3aed', medical: '#6366f1', tax: '#e11d48', agency: '#d97706', cost: '#a16207' }
+  };
+
+  var S = {
+    caseId: 'gov-civil',
+    city: 'sh',
+    gross: null,
+    employer: false,
+    deductions: 3000,
+    fundRate: null
+  };
+
+  var G = null;
+
+  function $(sel, r) { return (r || document).querySelector(sel); }
+  function $$(sel, r) { return Array.prototype.slice.call((r || document).querySelectorAll(sel)); }
+  function fmt(n) { return '¥' + Math.round(n).toLocaleString('en-US'); }
+  function pct(x, d) { return (x * 100).toFixed(d == null ? 1 : d) + '%'; }
+  function clamp(v, a, b) { return Math.min(b, Math.max(a, v)); }
+  function caseById(id) { for (var i = 0; i < D.cases.length; i++) if (D.cases[i].id === id) return D.cases[i]; return D.cases[0]; }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  /* ───────────────── 图结构 ───────────────── */
+  function buildGraph(r, c, employerView) {
+    var nodes = [], links = [], detail = {};
+    function add(id, label, value, layer, color, order, extra) {
+      if (!(value > 0.01)) return null;
+      var n = { id: id, label: label, value: value, layer: layer, color: color, order: order || 0 };
+      if (extra) for (var k in extra) n[k] = extra[k];
+      nodes.push(n);
+      return n;
+    }
+    function link(s, t, v, note) { if (v > 0.01) links.push({ source: s, target: t, value: v, note: note }); }
+
+    var hasRevenueCut = r.revenue - r.gross > 0.5;
+    var taxLabel = r.tax.kind === 'service' ? '个税（预扣）' : (r.tax.kind === 'business' ? '经营所得个税' : '个人所得税');
+
+    /* L0 来源 */
+    if (hasRevenueCut) {
+      add('rev', c.group === 'platform' ? '订单流水' : (c.id === 'construction' ? '工程款' : '经营流水'), r.revenue, 0, '#d4a017', 10);
+    } else {
+      r.comps.forEach(function (x) {
+        add('src' + x.i, x.label, x.value, 0, C.src[x.i], 10 + x.i);
+      });
+    }
+
+    /* L1 应发 */
+    add('gross', c.group === 'platform' || c.tax.type === 'business' ? '个人应发' : '税前应发', r.gross, 1, C.gross, 10);
+
+    /* 单位支干 */
+    var erTotal = r.er.si + r.er.hf + r.er.annuity + r.er.agency;
+    if (employerView && erTotal > 0.5) {
+      add('er0', '单位附加成本', erTotal, 0, '#94a3b8', 0);
+      add('er1', '单位缴纳', erTotal, 1, '#94a3b8', 0);
+      link('er0', 'er1', erTotal);
+    }
+
+    /* L2 扣缴项 */
+    var p = r.p;
+    var pItems = [
+      ['p-pension-a', '养老 8%（个人账户）', p.pensionAcct, C.personal.pension, 10, 'sink-acct', '进你自己名下，退休后按月领取，可继承'],
+      ['p-pension-p', '养老 12%（自缴统筹）', p.pensionPool, C.personal.pool, 10.5, 'sink-social', '灵活就业者自己承担的单位部分，进统筹基金'],
+      ['p-medical', '医疗（个人）', p.medical, C.personal.medical, 11, 'sink-medical', '医保统筹'],
+      ['p-unemp', '失业（个人）', p.unemp, C.personal.unemp, 12, 'sink-social', '失业保险基金'],
+      ['p-hf', '公积金（个人）', p.hf, C.personal.hf, 13, 'sink-hf', '住房公积金个人账户'],
+      ['p-annuity', '年金（个人）', p.annuity, C.personal.annuity, 14, 'sink-annuity', '职业/企业年金个人账户'],
+      ['p-tax', taxLabel, r.tax.withheld, C.personal.tax, 15, 'sink-tax', r.tax.kind === 'service' ? '预扣，年度汇算多退少补' : '国库']
+    ];
+    pItems.forEach(function (it) {
+      if (!(it[2] > 0.01)) return;
+      add(it[0], it[1], it[2], 2, it[3], it[4]);
+      link('gross', it[0], it[2]);
+      link(it[0], it[5], it[2], it[6]);
+    });
+
+    /* L3 去向 */
+    var net = add('sink-net', '到手现金', r.net, 3, C.sink.net, 0, { hero: true });
+    link('gross', 'sink-net', r.net, '扣除五险一金与个税后的可支配现金');
+
+    if (p.pensionAcct > 0.5) add('sink-acct', '养老个人账户', p.pensionAcct, 3, C.sink.acct, 1);
+    var hfTotal = p.hf + r.er.hf;
+    if (hfTotal > 0.5) add('sink-hf', '公积金账户', hfTotal, 3, C.sink.hf, 2);
+    var anTotal = p.annuity + r.er.annuity;
+    if (anTotal > 0.5) add('sink-annuity', '年金账户', anTotal, 3, C.sink.annuity, 3);
+    var socialTotal = p.pensionPool + p.unemp + r.er.pension + r.er.unemp + r.er.injury;
+    if (socialTotal > 0.5) add('sink-social', '社保统筹', socialTotal, 3, C.sink.social, 4);
+    var medTotal = p.medical + r.er.medical;
+    if (medTotal > 0.5) add('sink-medical', '医保统筹', medTotal, 3, C.sink.medical, 5);
+    if (r.tax.withheld > 0.5) add('sink-tax', '国库（个税）', r.tax.withheld, 3, C.sink.tax, 6);
+
+    /* 平台抽成 / 中介管理费 */
+    var agencyDeduct = r.er.agencyDeduct || 0;
+    var agencyClient = r.er.agency || 0;
+    var agencyTotal = agencyDeduct + (employerView ? agencyClient : 0);
+    if (agencyTotal > 0.5) {
+      add('sink-agency', (c.si && c.si.agency && c.si.agency.label) || '平台 / 中介', agencyTotal, 3, C.sink.agency, 7,
+        { note: agencyDeduct > 0 ? '从流水里直接扣走' : '用工单位在工资之外另付' });
+      if (agencyDeduct > 0.5) link('rev', 'sink-agency', agencyDeduct, '平台/中介从流水里抽走');
+    }
+    var extra = r.er.extra || 0;
+    if (extra > 0.5) {
+      add('sink-cost', '经营成本', extra, 3, C.sink.cost, 8, { note: '车辆、油电、设备等自付成本' });
+      if (hasRevenueCut) link('rev', 'sink-cost', extra);
+    }
+
+    /* 流水 → 应发 */
+    if (hasRevenueCut) {
+      link('rev', 'gross', r.gross);
+    } else {
+      r.comps.forEach(function (x) { if (x.value > 0.5) link('src' + x.i, 'gross', x.value); });
+    }
+
+    /* 单位分项 */
+    if (employerView && erTotal > 0.5) {
+      var erItems = [
+        ['e-pension', '养老（单位）', r.er.pension, C.employer.pension, 0, 'sink-social'],
+        ['e-medical', '医疗（单位）', r.er.medical, C.employer.medical, 1, 'sink-medical'],
+        ['e-other', '失业+工伤（单位）', r.er.unemp + r.er.injury, C.employer.other, 2, 'sink-social'],
+        ['e-hf', '公积金（单位）', r.er.hf, C.employer.hf, 3, 'sink-hf'],
+        ['e-annuity', '年金（单位）', r.er.annuity, C.employer.annuity, 4, 'sink-annuity'],
+        ['e-agency', '管理费 / 服务费', r.er.agency, C.employer.agency, 5, 'sink-agency']
+      ];
+      erItems.forEach(function (it) {
+        if (!(it[2] > 0.01)) return;
+        add(it[0], it[1], it[2], 2, it[3], it[4]);
+        link('er1', it[0], it[2]);
+        link(it[0], it[5], it[2]);
+      });
+      // 若管理费存在但 sink 未创建（极端情况）
+      if (r.er.agency > 0.5 && !nodes.some(function (n) { return n.id === 'sink-agency'; })) {
+        add('sink-agency', '管理费 / 中介', r.er.agency, 3, C.sink.agency, 6);
+      }
+    }
+
+    /* 细节说明 */
+    nodes.forEach(function (n) {
+      var rows = [
+        ['占本列合计', pct(n.value / (nodes.filter(function (m) { return m.layer === n.layer; })
+          .reduce(function (a, m) { return a + m.value; }, 0) || 1), 1)],
+        ['占税前应发', pct(n.value / (r.gross || 1), 1)]
+      ];
+      if (hasRevenueCut) rows.push(['占订单流水', pct(n.value / (r.revenue || 1), 1)]);
+      detail[n.id] = { title: n.label, value: n.value, color: n.color, rows: rows, note: n.note || '' };
+    });
+
+    return { nodes: nodes, links: links, detail: detail };
+  }
+
+  /* ───────────────── tooltip ───────────────── */
+  var tipEl, tipTimer;
+  function tipFn(kind, id, e) {
+    var st = K.state;
+    var html = '';
+    if (kind === 'node') {
+      var n = null;
+      st.nodes.forEach(function (m) { if (m.id === id) n = m; });
+      if (!n) return;
+      var d = G.detail[n.id] || {};
+      html = '<div class="tt-h"><span class="dot" style="background:' + n.color + '"></span>' + esc(n.label) + '</div>' +
+        '<div class="tt-v">' + fmt(n.value) + '<span>/ 月</span></div>' +
+        (d.rows ? '<div class="tt-rows">' + d.rows.map(function (r) {
+          return '<div><span>' + r[0] + '</span><b>' + r[1] + '</b></div>';
+        }).join('') + '</div>' : '') +
+        (d.note ? '<div class="tt-note">' + esc(d.note) + '</div>' : '');
+    } else {
+      var l = st.links[+id];
+      if (!l) return;
+      var s = st.byId.get(l.source), t = st.byId.get(l.target);
+      html = '<div class="tt-h">' + esc(s.label) + ' <i>→</i> ' + esc(t.label) + '</div>' +
+        '<div class="tt-v">' + fmt(l.value) + '<span>/ 月</span></div>' +
+        '<div class="tt-rows"><div><span>占来源</span><b>' + pct(l.value / (s.value || 1), 1) + '</b></div></div>' +
+        (l.note ? '<div class="tt-note">' + esc(l.note) + '</div>' : '');
+    }
+    tipEl.innerHTML = html;
+    tipEl.classList.add('show');
+    tipMove(e);
+  }
+  tipFn.move = function (e) { if (e) tipMove(e); };
+  tipFn.hide = function () { tipEl.classList.remove('show'); };
+  function tipMove(e) {
+    if (!e || !tipEl) return;
+    var host = $('#chartWrap').getBoundingClientRect();
+    var x = e.clientX - host.left + 16, y = e.clientY - host.top + 14;
+    var w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+    if (x + w > host.width - 8) x = e.clientX - host.left - w - 14;
+    if (y + h > host.height - 8) y = host.height - h - 8;
+    tipEl.style.transform = 'translate(' + Math.max(6, x) + 'px,' + Math.max(6, y) + 'px)';
+  }
+
+  /* ───────────────── 渲染 ───────────────── */
+  function currentCase() { return caseById(S.caseId); }
+
+  function recompute() {
+    if (tipEl) tipFn.hide();
+    var c = currentCase();
+    var r = E.compute(c, {
+      gross: S.gross, city: S.city, deductions: S.deductions,
+      fundRate: S.fundRate == null ? undefined : S.fundRate
+    });
+    G = buildGraph(r, c, S.employer && canEmployer(c));
+    K.render($('#sankey'), G, { tip: tipFn, height: 600 });
+    renderStats(r, c);
+    renderTable(r, c);
+    renderMeta(r, c);
+  }
+
+  function canEmployer(c) {
+    return !!(c.si && c.si.mode !== 'none' && c.si.mode !== 'self' && c.si.mode !== 'project' && c.si.mode !== 'injury') ||
+      (c.si && c.si.agency && c.si.agency.pay === 'client');
+  }
+
+  function renderStats(r, c) {
+    var cashRate = r.gross > 0 ? r.net / r.gross : 0;
+    var assetMonthly = r.hfMonthly + r.annuityMonthly + r.p.pensionAcct;
+    var taxRate = r.annual > 0 ? r.tax.final / r.annual : 0;
+    var hasEr = canEmployer(c);
+    var workerCut = r.agPay === 'worker';
+    var second = hasEr
+      ? { k: '单位总成本', v: fmt(r.cost), u: '/ 月', sub: (r.net > 0 ? (r.cost / r.net).toFixed(2) + '× 到手现金' : '—'), tone: 'blue' }
+      : { k: '订单 / 合同流水', v: fmt(r.revenue), u: '/ 月',
+          sub: workerCut
+            ? '到手 / 流水 ' + pct(r.stats.takeRate) + ' · ' + (r.net > 0 ? (r.revenue / r.net).toFixed(2) : '—') + '× 流水'
+            : '客户或平台支付总额',
+          tone: 'blue' };
+    var cards = [
+      { k: '到手现金', v: fmt(r.net), u: '/ 月',
+        sub: workerCut ? '占流水 ' + pct(r.stats.takeRate) : '现金到手率 ' + pct(cashRate), tone: 'green' },
+      second,
+      { k: '锁定在你名下的钱', v: fmt(assetMonthly), u: '/ 月', sub: '公积金 + 年金 + 养老个人账户', tone: 'teal' },
+      { k: '个人所得税', v: fmt(r.tax.final / 12), u: '/ 月',
+        sub: '有效税率 ' + pct(taxRate) + (r.tax.refundable > 0 ? ' · 预扣可退 ' + fmt(r.tax.refundable / 12) : ''), tone: 'red' }
+    ];
+    $('#stats').innerHTML = cards.map(function (c) {
+      return '<div class="stat ' + c.tone + '"><div class="stat-k">' + c.k + '</div>' +
+        '<div class="stat-v">' + c.v + '<span>' + c.u + '</span></div>' +
+        '<div class="stat-s">' + c.sub + '</div></div>';
+    }).join('');
+  }
+
+  function grossLabel(c) {
+    var t = (c.tax && c.tax.type) || 'wage';
+    return t === 'service' ? '劳务收入（月）' : t === 'business' ? '经营流水（月）'
+      : t === 'none' ? '现金收入（月）' : '税前应发（月）';
+  }
+
+  function renderTable(r, c) {
+    var rows = [];
+    function row(label, val, cls, indent) {
+      rows.push('<div class="tr ' + (cls || '') + (indent ? ' ind' : '') + '"><span>' + label + '</span><b>' + (val < 0 ? '−' : '') + fmt(Math.abs(val)) + '</b></div>');
+    }
+    if (r.revenue - r.gross > 0.5) {
+      row('订单 / 合同流水', r.revenue, 'strong');
+      if (r.er.agencyDeduct) row('平台 / 中介抽成', -r.er.agencyDeduct, 'sub', 1);
+      var extraOnly = r.er.extra - r.er.agencyDeduct;
+      if (extraOnly > 0.5) row('经营成本', -extraOnly, 'sub', 1);
+    }
+    row(grossLabel(c), r.gross, 'strong');
+    if (r.p.pension) row('养老（个人）', -r.p.pension, 'sub', 1);
+    if (r.p.medical) row('医疗（个人）', -r.p.medical, 'sub', 1);
+    if (r.p.unemp) row('失业（个人）', -r.p.unemp, 'sub', 1);
+    if (r.p.hf) row('公积金（个人）', -r.p.hf, 'sub', 1);
+    if (r.p.annuity) row('年金（个人）', -r.p.annuity, 'sub', 1);
+    if (r.tax.withheld) row(r.tax.kind === 'service' ? '个税（预扣）' : '个人所得税', -r.tax.withheld, 'tax', 1);
+    row('到手现金', r.net, 'net');
+
+    if (canEmployer(c)) {
+      rows.push('<div class="tr-sep"></div>');
+      row('单位五险一金', r.er.si + r.er.hf + r.er.annuity, 'sub');
+      if (r.er.agency) row('管理费 / 服务费', r.er.agency, 'sub');
+      row('用工总成本', r.cost, 'strong cost');
+    }
+    if (r.tax.refundable > 0.5) {
+      rows.push('<div class="tr-sep"></div>');
+      row('年度汇算后可退', r.tax.refundable, 'refund');
+    }
+    $('#table').innerHTML = rows.join('');
+    $('#tableNote').textContent = r.tax.kind === 'service'
+      ? '劳务报酬按次预扣，年度汇算按 80% 并入综合所得，多数情况下可退税。'
+      : (r.tax.kind === 'none' ? '按「未申报」建模：制度上仍属劳务报酬，付款方应预扣个税；现金结算、无合同、无社保，欠薪几乎无法维权。'
+      : (r.tax.kind === 'business' ? '经营所得已扣除成本与 6 万元费用扣除；个体户 ≤200 万部分减半征收。'
+        : '按年度综合所得计算后摊到每月；年终奖单独计税（政策执行至 2027-12-31）。'));
+  }
+
+  function renderMeta(r, c) {
+    $('#caseName').textContent = c.name;
+    $('#caseLegal').textContent = c.legal;
+    $('#caseIcon').textContent = c.icon;
+    $('#caseTag').textContent = c.tag || '';
+    $('#caseNote').textContent = c.note || '';
+    $('#caseCaveat').textContent = c.caveat || '';
+    $('#grossLabel').textContent = (c.tax.type === 'business' || c.group === 'platform' ? '月均流水' : '税前月均') ;
+    $('#grossVal').textContent = fmt(r.revenue);
+    $('#sliderHint').textContent = c.tax.type === 'business' || c.group === 'platform'
+      ? '流水 = 平台/客户支付总额，扣掉抽成后才是个人的应发' : '含年终奖、股权等全部收入的月度摊薄';
+  }
+
+  /* ───────────────── 控件 ───────────────── */
+  function initCity() {
+    $('#city').innerHTML = Object.keys(D.cities).map(function (k) {
+      return '<option value="' + k + '"' + (k === S.city ? ' selected' : '') + '>' + D.cities[k].name + '</option>';
+    }).join('');
+    $('#city').onchange = function () { S.city = this.value; recompute(); };
+  }
+
+  function initGroups() {
+    $('#groups').innerHTML = D.groups.map(function (g) {
+      return '<button class="chip' + (g.id === 'gov' ? ' on' : '') + '" data-g="' + g.id + '">' +
+        '<span>' + g.icon + '</span>' + g.name + '</button>';
+    }).join('');
+    $$('#groups .chip').forEach(function (b) {
+      b.onclick = function () {
+        $$('#groups .chip').forEach(function (x) { x.classList.remove('on'); });
+        b.classList.add('on');
+        renderCases(b.getAttribute('data-g'));
+      };
+    });
+    renderCases('gov');
+  }
+
+  function renderCases(groupId) {
+    var list = D.cases.filter(function (c) { return c.group === groupId; });
+    $('#cases').innerHTML = list.map(function (c) {
+      return '<button class="case' + (c.id === S.caseId ? ' on' : '') + '" data-id="' + c.id + '">' +
+        '<span class="ci">' + c.icon + '</span>' +
+        '<span class="cm"><b>' + c.name + '</b><i>' + fmt(c.gross) + ' · ' + (c.tag || '') + '</i></span>' +
+        '</button>';
+    }).join('');
+    $$('#cases .case').forEach(function (b) {
+      b.onclick = function () { selectCase(b.getAttribute('data-id')); };
+    });
+  }
+
+  function selectCase(id) {
+    S.caseId = id;
+    var c = currentCase();
+    S.gross = c.gross;
+    S.fundRate = null;
+    $$('#cases .case').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-id') === id); });
+    var g = $('#groups .chip[data-g="' + c.group + '"]');
+    if (g && !g.classList.contains('on')) { $$('#groups .chip').forEach(function (x) { x.classList.remove('on'); }); g.classList.add('on'); renderCases(c.group); }
+    initSlider();
+    syncFundSeg(c);
+    var canEr = canEmployer(c);
+    var btn = $('#viewToggle [data-view="cost"]');
+    btn.disabled = !canEr;
+    btn.title = canEr ? '' : '该形态没有单位缴费';
+    if (!canEr && S.employer) { S.employer = false; syncView(); }
+    recompute();
+  }
+
+  function syncFundSeg(c) {
+    var v = c.si && c.si.fund;
+    var any = !!(v > 0);
+    var btns = $$('#fundSeg button');
+    btns.forEach(function (b) {
+      b.disabled = !any;
+      b.classList.toggle('on', any && Math.abs(+b.getAttribute('data-v') - v) < 1e-6);
+    });
+    S.fundRate = null;
+  }
+
+  function initSlider() {
+    var c = currentCase();
+    var min = Math.max(1000, Math.floor(c.lo * 0.55 / 100) * 100);
+    var max = Math.ceil(c.hi * 1.7 / 100) * 100;
+    var r = $('#rGross');
+    r.min = min; r.max = max; r.step = 100; r.value = clamp(S.gross, min, max);
+    $('#grossMin').textContent = fmt(min);
+    $('#grossMax').textContent = fmt(max);
+  }
+
+  function syncView() {
+    $$('#viewToggle button').forEach(function (b) {
+      b.classList.toggle('on', (b.getAttribute('data-view') === 'cost') === S.employer);
+    });
+    document.body.classList.toggle('employer-view', S.employer);
+  }
+
+  /* ───────────────── 启动 ───────────────── */
+  function init() {
+    tipEl = $('#tip');
+    initCity();
+    initGroups();
+
+    $('#rGross').oninput = function () {
+      S.gross = +this.value;
+      $('#grossVal').textContent = fmt(S.gross);
+      recompute();
+    };
+    $('#rDeduct').oninput = function () {
+      S.deductions = +this.value;
+      $('#deductVal').textContent = fmt(S.deductions);
+      recompute();
+    };
+    $$('#fundSeg button').forEach(function (b) {
+      b.onclick = function () {
+        $$('#fundSeg button').forEach(function (x) { x.classList.remove('on'); });
+        b.classList.add('on');
+        S.fundRate = +b.getAttribute('data-v');
+        recompute();
+      };
+    });
+    $$('#viewToggle button').forEach(function (b) {
+      b.onclick = function () {
+        if (b.disabled) return;
+        S.employer = b.getAttribute('data-view') === 'cost';
+        syncView();
+        recompute();
+      };
+    });
+    $('#btnSvg').onclick = function () { K.exportSVG(slug() + '.svg'); };
+    $('#btnPng').onclick = function () { K.exportPNG(slug() + '.png', 2); };
+    $('#btnInfo').onclick = function () { $('#infoModal').showModal(); };
+    $('#btnCloseInfo').onclick = function () { $('#infoModal').close(); };
+    $('#infoModal').onclick = function (e) { if (e.target === this) this.close(); };
+
+    $('#srcList').innerHTML = D.meta.sources.map(function (s) {
+      return '<li><a href="' + s.url + '" target="_blank" rel="noopener">' + s.label + '</a></li>';
+    }).join('');
+
+    var timer = null;
+    window.addEventListener('resize', function () {
+      clearTimeout(timer);
+      timer = setTimeout(function () { if (G) K.render($('#sankey'), G, { tip: tipFn, height: 600 }); }, 140);
+    });
+
+    selectCase(S.caseId);
+    syncView();
+  }
+
+  function slug() {
+    var c = currentCase();
+    return '劳动收入-' + c.name + '-' + D.cities[S.city].name;
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+  root.LaborApp = { state: S, recompute: recompute, selectCase: selectCase };
+})(window);
+
+</script>
+</body>
+</html>
