@@ -217,7 +217,8 @@ function renderChart() {
     const nm = (p.data && p.data.labelText) || labelName(p);
     let body = '{n|' + nm + '}';
     const parts = [];
-    if (state.mode.pct) {
+    /* 「税前应发」恒为 100%，占比行没有信息量，只留名称 + 金额 */
+    if (state.mode.pct && p.name !== 'gross') {
       const pc = pctBase > 0 ? p.value / pctBase * 100 : 0;
       parts.push('{p|' + fmtPct1(pc) + ' ' + pctWord + '}');
     }
@@ -251,7 +252,7 @@ function renderChart() {
     left: pads.left,
     right: Math.max(pads.right, state.mode.pct ? (compactLabel ? 148 : 206) : 0),
     top: 60,
-    bottom: 40,
+    bottom: g.nodes.some(n => n.name === 't:other') ? 58 : 40,
     emphasis: { focus: 'adjacency' },
     label: { fontSize: compactLabel ? 12 : 15, formatter: nodeLabel, rich: labelRich, textBorderColor: '#fff', textBorderWidth: 2.5 },
     data: data,

@@ -206,13 +206,26 @@
     };
     /* 不足 1.2%（且低于 20 元）的落点并进「其他扣缴」，不留无标签的漂浮色块 */
     var tinyThreshold = Math.max(20, pctBase * 0.012);
+    var merged = {};
     function target(id, label, color, amount) {
       /* 单位成本视角的统筹池本身就有语义（工伤 0.3% 也得看得见），不参与合并 */
       var keepPool = employerView && /^t:(ppool|medpool|unemp|injury)$/.test(id);
-      if (id !== 't:net' && !keepPool && amount < tinyThreshold) return ['t:other', '其他扣缴', PAL.agency];
+      if (id !== 't:net' && !keepPool && amount < tinyThreshold) {
+        merged[id] = true;
+        return ['t:other', otherLabel(), otherColor()];
+      }
       return [id, label, color];
     }
     function ownerOf(id) { return OWNER[id] || ''; }
+    /* 个人视角被并进来的往往只有失业险：那就直接叫「失业统筹」，别用「其他扣缴」糊过去 */
+    function otherLabel() {
+      var keys = Object.keys(merged);
+      return keys.length === 1 && keys[0] === 't:unemp' ? '失业统筹' : '其他扣缴';
+    }
+    function otherColor() {
+      var keys = Object.keys(merged);
+      return keys.length === 1 && keys[0] === 't:unemp' ? PAL.pool : PAL.agency;
+    }
 
     /* ---------- 第 1 列：收入构成（按案例的 7 项拆分） ---------- */
     var grossRatio = revenue > 0 ? G / revenue : 1;
@@ -357,7 +370,13 @@
         if (hit) { hit.value = d.amount; hit.ownerNote = ownerOf(id); hit.pct = pctOf(d.amount, pctBase); hit.pctLine = fmtPct(hit.pct) + ' ' + pctWord + ' · ' + money(d.amount); }
         return;
       }
-      if (fill(id, d.label, d.amount, 3, d.color, 'right')) nodes[nodes.length - 1].ownerNote = ownerOf(id);
+      var lbl = id === 't:other' ? otherLabel() : d.label;
+      var col = id === 't:other' ? otherColor() : d.color;
+      if (fill(id, lbl, d.amount, 3, col, 'right')) {
+        nodes[nodes.length - 1].ownerNote = id === 't:other'
+          ? (lbl === '失业统筹' ? '进统筹池 · 换取待遇' : '其他扣缴合计')
+          : ownerOf(id);
+      }
     });
 
     /* ---------- 列内顺序：单位成本支干置顶，其次收入构成；扣缴 / 去向按固定次序 ---------- */

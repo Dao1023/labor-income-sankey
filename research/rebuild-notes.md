@@ -123,3 +123,42 @@ tooltip（`基数 ¥37,731 × 10.5%` / `税基 ¥17,333 × 20% − 速算 ¥1,41
 修订后数据校验：`node tools/check.mjs` → `检查 720 组，最大闭合误差 0.0000 元` / `✅ 全部通过`；
 桥接层 360 张图（30 案例 × 6 城 × 2 视角）逐节点 in==out 最大偏差 `0.0000`，无重名节点，
 个人视角无医疗/工伤统筹（自缴养老统筹除外），去向节点 100% 带归属文案。
+
+## 9. 第二轮评审收尾（3 项）+ 重构后实机复测
+
+收尾：
+
+1. 「税前应发」节点在占比开启时不再显示占比行（恒为 100%，无信息量），只留名称 + 金额。
+2. 个人视角里被并进来的落点，若只有失业险一项，节点直接叫「失业统筹」（紫色，共担池语义），
+   不再笼统写「其他扣缴」；确实混合了多项时才叫「其他扣缴」（灰色）。
+3. 图例按图上真实出现的颜色动态生成：`renderLegend(g)` 收集节点 `itemStyle.color`，
+   个人视角没有平台/中介时灰色项不出现；单位成本视角出现统筹池时才显示紫色「共担池」。
+
+实机复测（私有 headless 实例，`--user-data-dir=%TEMP%\li-shot`，端口 9333，CDP 真实事件，未碰用户浏览器）：
+
+```
+rail  6 案例点击 → 标题/hash/节点文字全部变化
+  互联网大厂  → #                (60 paths)
+  公务员      → #c=gov-civil     (63)
+  众包骑手    → #c=rider         (28)
+  劳务派遣    → #c=dispatch      (43)
+  自由设计师  → #c=freelance     (35)
+  日结零工    → #c=daylabor      (11)
+滑杆  mousePressed + 6×mouseMoved + mouseReleased
+  ¥3,500 → ¥4,250 → ¥5,000 → ¥5,750 → ¥6,500 → ¥7,250   (6 个不同值)
+  松手后仍为 ¥7,250（不回弹）；.tl-dot.near = 1；.tl-dot = 21；hash #c=daylabor&g=7250
+节点  DataIndex 0（基本工资）真实点击
+  点击前 dimmed=0 → 点击后 dimmed=58（adjacency 生效，click 事件 dataType=node）
+  点空白 dimmed=0（downplay 恢复）
+导出  按钮真实点击（Browser.setDownloadBehavior 拦截）
+  labor_income_daylabor_sh_7250.png  3200×2072（1600×900 @2x + 96 页眉 + 40 水印）
+  labor_income_daylabor_sh_7250.svg  4,379 bytes
+window.onerror 计数 = 0
+```
+
+`node tools/check.mjs` → `检查 720 组，最大闭合误差 0.0000 元` / `✅ 全部通过`；
+`node tools/build.mjs` → `inlined 5 scripts`，`dist/labor-income.html` 零外链。
+
+截图（本轮）：`shots/final-personal.png`（大厂·个人）、`shots/final-gov.png`（公务员·个人）、
+`shots/final-cost.png`（大厂·单位成本）、`shots/final-pct.png`（大厂·个人·占比开启）、
+`shots/final-dist.png`（单文件包首屏）。
