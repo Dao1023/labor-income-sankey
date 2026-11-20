@@ -107,7 +107,7 @@ function snapGross(v) {
 function computeNow() {
   const c = curCase();
   const r = engine.compute(c, { city: state.city, gross: state.gross });
-  return { c: c, r: r };
+  return { c: c, r: r, meta: bridge.metaOf(c, r), formula: bridge.formulaOf(c, r) };
 }
 function pctBaseOf(r) {
   return state.view === 'cost' ? r.cost : (r.agPay === 'worker' ? r.revenue : r.gross);
@@ -130,6 +130,12 @@ const labelName = n => displayName(n);
 /* 金额文案：元/月，千分位 */
 const amtText = v => Math.round(Math.abs(v)).toLocaleString('en-US');
 const dispSym = () => '¥';
+
+/* 节点 id → 中文标签（调试元数据 / tooltip 用） */
+const labelOfGraph = (g, id) => {
+  const n = g.nodes.find(x => x.name === id);
+  return (n && n.labelText) || displayName({ name: id });
+};
 
 /* ------------------------------------------------------------------ *
  * 一致性校验（上游 checkConsistency 的结构，判据换成本主题的闭合关系）
@@ -187,8 +193,8 @@ function renderChart() {
     gross: state.gross,
     view: state.view,
     pct: state.mode.pct,
-    nodes: g.nodes.map(n => ({ name: displayName(n), value: +n.value.toFixed(4), depth: n.depth })),
-    links: g.links.map(l => ({ source: displayName({ name: l.source }), target: displayName({ name: l.target }), value: +l.value.toFixed(4) }))
+    nodes: g.nodes.map(n => ({ id: n.name, name: n.labelText || displayName(n), value: +n.value.toFixed(4), depth: n.depth })),
+    links: g.links.map(l => ({ source: labelOfGraph(g, l.source), target: labelOfGraph(g, l.target), value: +l.value.toFixed(4) }))
   };
   document.getElementById('chartTitle').textContent = chartTitleOf(bundle);
 
@@ -207,7 +213,8 @@ function renderChart() {
   /* 两行标签：名称 / （占比 ·）金额。占比是叠加，不是切换。 */
   function nodeLabel(p) {
     const amt = dispSym() + amtText(p.value);
-    let body = '{n|' + labelName(p) + '}';
+    const nm = (p.data && p.data.labelText) || labelName(p);
+    let body = '{n|' + nm + '}';
     const parts = [];
     if (state.mode.pct) {
       const pc = pctBase > 0 ? p.value / pctBase * 100 : 0;
@@ -218,14 +225,16 @@ function renderChart() {
     return body;
   }
 
+  const labelOf = new Map(g.nodes.map(n => [n.name, n.labelText]));
   const data = g.nodes.map(n => {
-    const d = { name: n.name, value: n.value, depth: n.depth, itemStyle: n.itemStyle };
+    const d = { name: n.name, value: n.value, depth: n.depth, labelText: n.labelText, baseNote: n.baseNote, itemStyle: n.itemStyle };
     let pos = 'top';
     if (n.depth === 0) pos = 'left';
     else if (n.depth >= 3) pos = 'right';
     d.label = { position: pos, distance: pos === 'top' ? 6 : 8, formatter: nodeLabel };
-    /* 极小额（几分钱）节点不画标签，避免出现「¥0」 */
-    if (n.value < 2) d.label = { show: false };
+    /* 极小节点：标签（两行 37px）比色块还高，画出来只会互相压字。
+       1.5% 以下不画标签——它的去向节点仍带名字和金额，信息不丢。 */
+    if (n.value < 2 || (pctBase > 0 && n.value / pctBase < 0.015)) d.label = { show: false };
     return d;
   });
 
@@ -236,7 +245,7 @@ function renderChart() {
     nodeWidth: 30,
     nodeGap: 22,
     left: pads.left,
-    right: pads.right,
+    right: Math.max(pads.right, state.mode.pct ? (compactLabel ? 148 : 206) : 0),
     top: 60,
     bottom: 40,
     emphasis: { focus: 'adjacency' },
@@ -247,6 +256,10 @@ function renderChart() {
   if (compactLabel) {
     series.avoidLabelOverlap = true;
     series.labelLayout = { hideOverlap: true };
+  } else {
+    /* 中文标签比上游的「NVDA ¥1.2B」宽得多，扣缴列相邻小节点的两行标签会叠：
+       让 ECharts 只做纵向位移避让，不隐藏任何标签。 */
+    series.labelLayout = { moveOverlap: 'shiftY' };
   }
 
   chart.setOption({
@@ -256,12 +269,14 @@ function renderChart() {
       confine: true,
       formatter: p => {
         if (p.dataType === 'edge') {
-          return displayName({ name: p.data.source }) + ' → ' + displayName({ name: p.data.target }) +
+          return (labelOf.get(p.data.source) || displayName({ name: p.data.source })) + ' → ' +
+            (labelOf.get(p.data.target) || displayName({ name: p.data.target })) +
             '<br/><b>' + dispSym() + amtText(p.data.value) + '</b>';
         }
         const pc = pctBase > 0 ? p.value / pctBase * 100 : 0;
-        return '<b>' + labelName(p) + '</b><br/>' + dispSym() + amtText(p.value) +
-          '<br/>' + fmtPct1(pc) + ' ' + pctWord;
+        const bn = p.data && p.data.baseNote;
+        return '<b>' + ((p.data && p.data.labelText) || labelName(p)) + '</b><br/>' + dispSym() + amtText(p.value) +
+          '<br/>' + fmtPct1(pc) + ' ' + pctWord + (bn ? '<br/><span style="color:#52607a">' + bn + '</span>' : '');
       }
     },
     series: [series]
@@ -529,10 +544,12 @@ function renderMeta(bundle) {
   bits.push('社保 ' + bundle.meta.si);
   bits.push('应发 ' + money(r.gross) + '/月');
   if (r.revenue > r.gross + 0.5) bits.push('流水 ' + money(r.revenue) + '/月');
-  const note = [c.tag, c.caveat || c.note].filter(Boolean).join(' · ');
+  /* 公式带：位置与样式沿用上游 #segNotesLine / .segNote，内容换成逐项展开的算式。
+     每一项都来自引擎结果（r.*），口径说明（tag / caveat）挪到「口径说明」弹窗里。 */
+  const band = bundle.formula || '';
   document.getElementById('metaLine').innerHTML =
     bits.map(b => '<span>' + b + '</span>').join(' · ') +
-    (note ? '<div class="segNote" id="segNotesLine">' + note + '</div>' : '');
+    (band ? '<div class="segNote" id="segNotesLine">' + band + '</div>' : '');
 }
 
 function renderControls() {
@@ -611,7 +628,14 @@ function exportHeaderData() {
 }
 function exportOption() {
   const base = window.__lastOption || (chart && chart.getOption()) || {};
-  return Object.assign({}, base, { backgroundColor: '#f2efe9', animation: false, tooltip: undefined });
+  const opt = Object.assign({}, base, { backgroundColor: '#f2efe9', animation: false, tooltip: undefined });
+  /* 导出画布固定 1600×900，比屏幕宽；照搬屏幕的左右留白会把首列名称和
+     右侧「占比 · 金额」顶出画布。这里只给导出用的桑基列换一组固定留白，
+     其余选项（含 tooltip:undefined）保持上游写法。 */
+  if (Array.isArray(opt.series) && opt.series[0] && opt.series[0].type === 'sankey') {
+    opt.series = opt.series.map(s => Object.assign({}, s, { left: 300, right: 270 }));
+  }
+  return opt;
 }
 function exportWatermark() {
   const meta = LABOR.meta || {};
@@ -807,6 +831,13 @@ function main() {
   });
   render();
   window.__ready = true;
+  /* 自检用钩子：批量渲染 30 案例 × 6 城 × 2 视角 × 占比开关（见 research/rebuild-notes.md） */
+  window.__laborTest = {
+    state: state,
+    set: function (patch) { Object.assign(state, patch); render(); },
+    bridge: bridge,
+    engine: engine
+  };
 }
 
 main();
