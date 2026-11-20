@@ -212,9 +212,23 @@ function renderChart() {
   };
 
   /* 两行标签：名称 / （占比 ·）金额。占比是叠加，不是切换。 */
+  /* 单行标签：小节点只写名字，金额与占比留给 tooltip */
+  function shortNodeLabel(p) {
+    return '{n|' + ((p.data && p.data.labelText) || labelName(p)) + '}';
+  }
+
   function nodeLabel(p) {
     const amt = dispSym() + amtText(p.value);
     const nm = (p.data && p.data.labelText) || labelName(p);
+    /* 阶段节点是中间态：只写「缴 X 后」，数值由带子宽度表达；单行显示，
+       七列并排时才不会和扣缴节点的两行标签互相压字。 */
+    /* 阶段节点：名称 + 累计剩余，瀑布的递减线必须看得见数字 */
+    if (p.data && p.data.stage) {
+      const line1 = '{s|' + nm + '}  {sv|' + dispSym() + amtText(p.value) + '}';
+      if (!state.mode.pct) return line1;
+      const pc0 = pctBase > 0 ? p.value / pctBase * 100 : 0;
+      return line1 + '\n' + '{p|' + fmtPct1(pc0) + ' ' + pctWord + '}';
+    }
     let body = '{n|' + nm + '}';
     const parts = [];
     /* 「税前应发」恒为 100%，占比行没有信息量，只留名称 + 金额 */
@@ -229,17 +243,21 @@ function renderChart() {
 
   const labelOf = new Map(g.nodes.map(n => [n.name, n.labelText]));
   const data = g.nodes.map(n => {
-    const d = { name: n.name, value: n.value, depth: n.depth, labelText: n.labelText, baseNote: n.baseNote, ownerNote: n.ownerNote, detailNote: n.detailNote, itemStyle: n.itemStyle };
-    let pos = 'top';
-    if (n.depth === 0) pos = 'left';
-    else if (n.depth >= 3) pos = 'right';
-    d.label = { position: pos, distance: pos === 'top' ? 6 : 8, formatter: nodeLabel };
+    const d = { name: n.name, value: n.value, depth: n.depth, labelText: n.labelText, stage: n.stage, noLabel: n.noLabel, baseNote: n.baseNote, ownerNote: n.ownerNote, detailNote: n.detailNote, itemStyle: n.itemStyle };
+    /* 位置由 labor.js 给：左侧收入 / 扣缴在上 / 瀑布主干在下 / 去向在右 */
+    let pos = n.pos || 'top';
+    d.label = { position: pos, distance: 8, formatter: nodeLabel };
     /* 极小节点：标签（两行 37px）比色块还高，画出来只会互相压字。
        1.5% 以下不画标签——它的去向节点仍带名字和金额，信息不丢。 */
-    if (n.name === 't:other') d.label = { position: 'bottom', distance: 6, formatter: nodeLabel };
+    if (n.name === 'd:tax') d.label = { position: 'bottom', distance: 6, formatter: nodeLabel };
+    else if (n.noLabel) d.label = { show: false };
+    else if (n.name === 't:other') d.label = { position: 'right', distance: 8, formatter: shortNodeLabel };
     else if (state.view === 'cost' && /^t:(ppool|medpool|unemp|injury)$/.test(n.name) && n.value >= 20) {
-      d.label = { position: 'right', distance: 8, formatter: nodeLabel };  /* 单位视角的统筹池：再小也要有名有姓 */
-    } else if (n.value < 2 || (pctBase > 0 && n.value / pctBase < 0.012)) d.label = { show: false };
+      d.label = { position: 'right', distance: 8, formatter: shortNodeLabel };  /* 单位视角的统筹池：再小也要有名有姓 */
+    } else if ((pctBase > 0 && n.value / pctBase < 0.03) && /^t:/.test(n.name) && n.name !== 't:net') {
+      /* 去向列不到 3% 的账户：只留一行名字，两行会和小节点压字 */
+      d.label = { position: 'right', distance: 8, formatter: shortNodeLabel };
+    } else if (!/^d:/.test(n.name) && (n.value < 2 || (pctBase > 0 && n.value / pctBase < 0.012))) d.label = { show: false };
     return d;
   });
 

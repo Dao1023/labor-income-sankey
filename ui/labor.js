@@ -18,6 +18,15 @@
   if (!D || !E) throw new Error('ui/labor.js 需要先加载 ../app/data.js 与 ../app/engine.js');
 
   /* ---------- 配色（沿用旧版语义色，不做渐变） ---------- */
+  /* 主干每段递进一档同色相，读数时能看出「断了几次」 */
+  function mixHex(a, b, t) {
+    function p(h) { return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; }
+    var A = p(a), B = p(b), C = [0, 0, 0];
+    for (var i = 0; i < 3; i++) C[i] = Math.round(A[i] + (B[i] - A[i]) * Math.max(0, Math.min(1, t)));
+    return '#' + C.map(function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+  }
+  var TRUNK_FROM = '#7aa6d2', TRUNK_TO = '#0f3459';
+
   var PAL = {
     income: '#3b82c4',
     gross: '#1d55a5',
@@ -131,12 +140,18 @@
         + ' = 年税 ' + money(r.tax.annual || 0);
     }
 
-    /* comprehensive：工资薪金 / 实习劳务 */
+    /* comprehensive：工资薪金 / 实习劳务
+       单项计税的年终奖、股权不进综合所得税基，必须在式子里显式减掉，
+       否则「应发 − 社保 − 公积金 − 起征点 − 专扣」算不回引擎的税基。 */
     var parts = ['应发 ' + money(gross)];
     if (c.tax && c.tax.type !== 'intern') {
       if (P.si > 0.5) parts.push('社保 ' + money(P.si) + '（基 ' + money(r.siBase) + ' × ' + pct1(ctx.siRate) + '）');
       if (P.hf > 0.5) parts.push('公积金 ' + money(P.hf) + '（基 ' + money(r.hfBase) + ' × ' + pct1(ctx.hfRate) + '）');
       if (P.annuity > 0.5) parts.push('年金 ' + money(P.annuity) + '（基 ' + money(gross) + ' × ' + pct1(ctx.annRate) + '）');
+      var bonusM = (r.bonusMethod === 'separate' ? (r.bonusAnnual || 0) : 0) / 12;
+      if (bonusM > 0.5) parts.push('年终奖 ' + money(bonusM) + '（单独计税）');
+      var equityM = (r.equityAnnual || 0) / 12;
+      if (equityM > 0.5) parts.push('股权 ' + money(equityM) + '（单独计税）');
     }
     parts.push('起征点 ' + money(5000));
     if (ded > 0.5) parts.push('专扣 ' + money(ded));
@@ -146,6 +161,30 @@
     return head + ' = 税基 ' + money(baseM) + ' × ' + pct1(r.taxRate || 0)
       + (ctx.quickMonth > 0.5 ? ' − 速算 ' + money(ctx.quickMonth) : '')
       + ' = 个税 ' + money(taxM);
+  }
+
+  /* 税基的来路：必须能和上下游每一分钱对上，写进个税节点 tooltip */
+  function taxBaseNote(c, r, pre) {
+    var kind = r.taxBaseKind || 'none';
+    var base = r.taxBase || 0;
+    if (kind === 'none') return '无个税';
+    if (kind === 'service') {
+      return '税基 ' + money(base) + ' = 应发 ' + money(r.gross) + ' × 80%（预扣口径）';
+    }
+    if (kind === 'business') {
+      if (c.tax && c.tax.mode === 'deemed') {
+        return '税基 ' + money(base) + ' = 年应发 ' + money(r.annual) + ' ÷ 12（核定征收）';
+      }
+      return '税基 ' + money(base) + ' = 年应发 ' + money(r.annual) + ' ÷ 12 − 起征点 − 社保公积金年金 − 专扣';
+    }
+    var seg = ['税基 ' + money(base) + ' = 缴扣后 ' + money(pre)];
+    var bonusM = (r.bonusMethod === 'separate' ? (r.bonusAnnual || 0) : 0) / 12;
+    if (bonusM > 0.5) seg.push('年终奖 ' + money(bonusM) + '（单独计税）');
+    var eqM = (r.equityAnnual || 0) / 12;
+    if (eqM > 0.5) seg.push('股权 ' + money(eqM) + '（单独计税）');
+    seg.push('起征点 ' + money(5000));
+    if (r.deductionsMonthly > 0.5) seg.push('专扣 ' + money(r.deductionsMonthly));
+    return seg.join(' − ') + (base <= 0 ? ' = 未达起征点' : '');
   }
 
   /* ---------- 主构建 ---------- */
@@ -204,16 +243,10 @@
       't:agency': '平台 / 中介拿走',
       't:other': '其他扣缴合计'
     };
-    /* 不足 1.2%（且低于 20 元）的落点并进「其他扣缴」，不留无标签的漂浮色块 */
-    var tinyThreshold = Math.max(20, pctBase * 0.012);
+    /* 不合并落点：税、社保、账户、中介是四种性质完全不同的钱，
+       哪怕只有几十块也各走各的节点（标签放不下时只省略金额，不改名不换色） */
     var merged = {};
     function target(id, label, color, amount) {
-      /* 单位成本视角的统筹池本身就有语义（工伤 0.3% 也得看得见），不参与合并 */
-      var keepPool = employerView && /^t:(ppool|medpool|unemp|injury)$/.test(id);
-      if (id !== 't:net' && !keepPool && amount < tinyThreshold) {
-        merged[id] = true;
-        return ['t:other', otherLabel(), otherColor()];
-      }
       return [id, label, color];
     }
     function ownerOf(id) { return OWNER[id] || ''; }
@@ -240,23 +273,12 @@
       if (toCut > 0.004) flow(id, 'cut', toCut, PAL.agency);
     });
 
-    /* ---------- 第 2 列：税前应发 ---------- */
+    /* ---------- 瀑布主干：应发 → 减社保 → 减公积金 → 减年金 → 减个税 → 到手 ----------
+       每一步在上方分出一股扣缴（宽度就是真金白银），主干在同一列下方继续递减，
+       读起来就是利润表：扣完一项还剩多少。起征点 / 专扣 / 税基不是现金流，
+       只出现在公式带与 tooltip 里，不做节点。 */
     fill('gross', '税前应发', G, 1, PAL.gross, 'top');
 
-    /* 流水层抽成（平台 / 中介 / 运营成本） */
-    if (cut > 0.004) {
-      var cutLabel = r.agPay === 'worker' ? '平台抽成'
-        : ((c.tax && c.tax.type === 'business') ? '运营成本' : '其他扣减');
-      var cutDest = r.agPay === 'worker' ? '平台 / 中介'
-        : ((c.tax && c.tax.type === 'business') ? '运营成本' : '其他扣减');
-      fill('cut', cutLabel, cut, 2, PAL.agency, 'top');
-      flow('cut', 't:agency', cut, PAL.agency);
-      sink('t:agency', cutDest, PAL.agency, cut, 3);
-    }
-
-    /* ---------- 第 3 列：个人扣缴（社保个人 / 公积金 / 年金 / 个税） ----------
-       「基数 × 费率」是引擎内部的一层，做成节点会破坏流量守恒，所以只放在
-       节点名（费率）、tooltip 与图上方公式带（基数 / 税基）三处。 */
     var P = r.p;
     var siBase = r.siBase, hfBase = r.hfBase;
     var siRate = siBase > 0 ? (P.pension + P.medical + P.unemp) / siBase : 0;
@@ -266,12 +288,14 @@
     var T = E.tables || {};
     var tb = null;
     if (r.taxBaseKind === 'comprehensive') tb = bracketOf(T.WAGE_TABLE || [], taxBase * 12);
-    else if (r.taxBaseKind === 'business') tb = bracketOf(T.BIZ_TABLE || [], taxBase * 12);
+    else if (r.taxBaseKind === 'business' && !(c.tax && c.tax.mode === 'deemed')) tb = bracketOf(T.BIZ_TABLE || [], taxBase * 12);
+    /* 劳务报酬 / 核定征收不走超额累进档位，没有速算扣除数 */
     var quickMonth = tb ? (tb.quick || 0) / 12 : 0;
 
-    var items = [
+    var steps = [
       {
-        id: 'd:si', label: '社保个人 ' + pct1(siRate), v: P.pension + P.medical + P.unemp,
+        id: 'd:si', label: '社保个人 ' + pct1(siRate), after: '缴社保后',
+        v: P.pension + P.medical + P.unemp,
         base: '基数 ' + money(siBase) + ' × ' + pct1(siRate),
         dests: [['t:pacct', '养老个人账户', PAL.acct, P.pensionAcct],
                 /* 统筹是单位缴的钱，个人视角只保留灵活就业「自缴 12%」那一档 */
@@ -280,41 +304,82 @@
                 ['t:unemp', '失业统筹', PAL.pool, P.unemp]]
       },
       {
-        id: 'd:hf', label: '公积金 ' + pct1(hfRate), v: P.hf,
+        id: 'd:hf', label: '公积金 ' + pct1(hfRate), after: '缴公积金后', v: P.hf,
         base: '基数 ' + money(hfBase) + ' × ' + pct1(hfRate),
         dests: [['t:hf', '公积金账户', PAL.acct, P.hf]]
       },
       {
-        id: 'd:ann', label: '年金 ' + pct1(annRate), v: P.annuity,
+        id: 'd:ann', label: '年金 ' + pct1(annRate), after: '缴年金后', v: P.annuity,
         base: '基数 ' + money(G) + ' × ' + pct1(annRate),
         dests: [['t:ann', '年金账户', PAL.acct, P.annuity]]
       },
       {
-        id: 'd:tax', label: '个税', v: P.tax,
-        base: '税基 ' + money(taxBase) + ' × ' + pct1(taxRate) + (quickMonth > 0.5 ? ' − 速算 ' + money(quickMonth) : ''),
+        id: 'd:tax', label: '个税', after: '缴个税后', v: P.tax,
+        baseFn: function (pre) {
+          return taxBaseNote(c, r, pre) + ' × ' + pct1(taxRate)
+            + (quickMonth > 0.5 ? ' − 速算 ' + money(quickMonth) : '');
+        },
         dests: [['t:tax', '国库', PAL.tax, P.tax]]
       }
     ];
-    items.forEach(function (it) {
-      var id = fill(it.id, it.label, it.v, 2, PAL.deduct, 'right');
-      if (!id) return;
-      nodes[nodes.length - 1].baseNote = it.base;
-      flow('gross', id, it.v, PAL.deduct);
-      it.dests.forEach(function (d) {
-        if (!(d[3] > 0.004)) return;
-        var t = target(d[0], d[1], d[2], d[3]);
-        flow(id, t[0], d[3], t[2]);
-        sink(t[0], t[1], t[2], d[3], 3);
-      });
-    });
 
-    /* 到手现金：应发的剩余部分。ECharts 5 的 sankey 支持 data[].depth 显式分层
-       （已实测），所以这里直接给 3，让它与各项扣缴的落点同在「去向」列。 */
-    fill('t:net', '到手现金', r.net, 3, PAL.net, 'right');
-    flow('gross', 't:net', r.net, PAL.net);
+    var prev = 'gross', remaining = G, col = 1;
+    /* 只有后面还有扣缴时才需要「缴 X 后」中间节点；最后一项扣完的余额
+       直接就是「到手现金」，再画一个等值的中间节点只是多一道空转。 */
+    var live = steps.filter(function (s) { return s.v > 0.004; });
+    live.forEach(function (s, si) {
+      if (!(s.v > 0.004)) return;            /* 无年金 / 无个税：整列跳过，不留空列 */
+      col += 1;
+      var id = fill(s.id, s.label, s.v, col, PAL.deduct, 'right');
+      if (!id) return;
+      nodes[nodes.length - 1].baseNote = s.baseFn ? s.baseFn(remaining) : s.base;
+      flow(prev, s.id, s.v, PAL.deduct, 0.55);
+      s.dests.forEach(function (d) {
+        if (!(d[3] > 0.004)) return;
+        var tt = target(d[0], d[1], d[2], d[3]);
+        flow(s.id, tt[0], d[3], tt[2]);
+        sink(tt[0], tt[1], tt[2], d[3], 3);
+      });
+      var rest = remaining - s.v;
+      if (rest > 0.004) {
+        /* 「缴 X 后」这一列节点让主干保持水平，扣缴带才不会绕回上方 */
+        var stId = 'stage' + col;
+        var isLastStage = (si === live.length - 1);
+        /* 最后一站：余额已经就是到手现金，主干从这里起换成现金绿，不再重复写一遍金额 */
+        var stCol = mixHex(TRUNK_FROM, TRUNK_TO, col / (live.length + 1));
+        fill(stId, s.after, rest, col, stCol, 'top');
+        nodes[nodes.length - 1].stage = true;
+        nodes[nodes.length - 1].stageColor = stCol;
+        if (isLastStage) nodes[nodes.length - 1].noLabel = true;
+        /* 阶段节点描一圈底色，主干在每一层视觉上「断」一下 */
+        nodes[nodes.length - 1].itemStyle.borderColor = '#f2efe9';
+        nodes[nodes.length - 1].itemStyle.borderWidth = 3;
+        flow(prev, stId, rest, stCol, 0.9);
+        prev = stId;
+      }
+      remaining = rest;
+    });
+    var destCol = col + 1;
+
+    /* 流水层抽成（平台 / 中介 / 运营成本）：与「税前应发」同列，末端直接落到「钱去哪了」 */
+    if (cut > 0.004) {
+      var cutLabel = r.agPay === 'worker' ? '平台抽成'
+        : ((c.tax && c.tax.type === 'business') ? '运营成本' : '其他扣减');
+      var cutDest = r.agPay === 'worker' ? '平台 / 中介'
+        : ((c.tax && c.tax.type === 'business') ? '运营成本' : '其他扣减');
+      fill('cut', cutLabel, cut, 1, PAL.agency, 'top');
+      flow('cut', 't:agency', cut, PAL.agency);
+      sink('t:agency', cutDest, PAL.agency, cut, 3);
+    }
+
+    /* 到手现金 = 最后一层扣完的剩余 */
+    fill('t:net', '到手现金', r.net, destCol, PAL.net, 'right');
+    flow(prev, 't:net', r.net, PAL.net);
     sink('t:net', '到手现金', PAL.net, r.net, 3);
 
-    /* ---------- 单位成本支干（只在单位成本视角出现） ---------- */
+    /* ---------- 单位成本支干（只在单位成本视角出现，不参与个人瀑布） ----------
+       单位侧也做抽象：社保合成一条粗带（养老/医疗/失业/工伤），公积金、年金各一条；
+       五险明细只进 tooltip，避免四条细流从右下穿过个人流带。 */
     var ER = r.er;
     var eTotal = (ER.si || 0) + (ER.hf || 0) + (ER.annuity || 0) + (ER.agency || 0);
     if (employerView && eTotal > 0.004) {
@@ -322,8 +387,6 @@
       fill('unit', '单位缴纳', eTotal, 1, PAL.unit, 'top');
       flow('u:extra', 'unit', eTotal, PAL.unit);
 
-      /* 单位侧也做抽象：社保合成一条粗带（养老/医疗/失业/工伤），公积金、年金各一条。
-         五险明细只进 tooltip，避免四条细流从右下穿过个人流带。 */
       var siBaseEr = r.siBase || G;
       var erTip = '养老 ' + money(ER.pension) + ' · 医疗 ' + money(ER.medical) +
                   ' · 失业 ' + money(ER.unemp) + ' · 工伤 ' + money(ER.injury);
@@ -363,7 +426,7 @@
     });
     destOrder.forEach(function (id) {
       var d = dests[id];
-      /* 到手现金节点已在上面建过（它既是终点又是「去向」格），不要重复 */
+      /* 到手现金节点已在瀑布末尾建过（它既是终点又是「去向」格），不要重复 */
       if (id === 't:net') {
         var hit = null;
         nodes.forEach(function (n) { if (n.name === 't:net') hit = n; });
@@ -371,8 +434,8 @@
         return;
       }
       var lbl = id === 't:other' ? otherLabel() : d.label;
-      var col = id === 't:other' ? otherColor() : d.color;
-      if (fill(id, lbl, d.amount, 3, col, 'right')) {
+      var col2 = id === 't:other' ? otherColor() : d.color;
+      if (fill(id, lbl, d.amount, destCol, col2, 'right')) {
         nodes[nodes.length - 1].ownerNote = id === 't:other'
           ? (lbl === '失业统筹' ? '进统筹池 · 换取待遇' : '其他扣缴合计')
           : ownerOf(id);
@@ -388,6 +451,7 @@
       if (n.name === 'cut') return 30;
       if (n.name === 'gross') return 31;
       if (n.name === 'unit') return 32;
+      if (n.name.indexOf('stage') === 0) return 38;
       var di = DORDER.indexOf(n.name); if (di >= 0) return 40 + di;
       if (n.name === 't:net') return 46;
       var ui = UORDER.indexOf(n.name); if (ui >= 0) return 50 + ui;
