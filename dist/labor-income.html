@@ -24,8 +24,14 @@ body { background:var(--bg); color:var(--text); font-family:"Segoe UI","Microsof
   scrollbar-width:none; -ms-overflow-style:none; /* scrollable, scrollbar hidden */ }
 #logoRail::-webkit-scrollbar { display:none; }
 /* 单列文字清单：一行一个案例，左侧 3px 竖条标当前选中 */
-.grp { font-size:11px; font-weight:600; color:var(--muted); letter-spacing:.04em; margin:12px 0 3px 10px; }
+.grp { font-size:11px; font-weight:600; color:#5b6b82; letter-spacing:.04em;
+  margin:14px 0 4px 10px; padding-bottom:4px; border-bottom:1px solid rgba(100,116,139,.16); }
 .grp:first-child { margin-top:0; }
+/* 底部渐变提示「还能往下滚」，滚到底淡出 */
+.railFade { position:sticky; bottom:0; height:28px; margin-top:-28px; pointer-events:none;
+  background:linear-gradient(to top, var(--card), rgba(255,255,255,0));
+  transition:opacity .18s; }
+.railFade.hide { opacity:0; }
 .logo { position:relative; display:block; height:28px; line-height:28px; padding:0 10px; border-radius:6px;
   font-size:13px; color:var(--text); background:transparent; border:none; box-shadow:none; cursor:pointer;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:background .15s, color .15s; }
@@ -131,6 +137,7 @@ body { background:var(--bg); color:var(--text); font-family:"Segoe UI","Microsof
   .layout { flex-direction:column; }
   #logoRail { position:static; width:100%; display:grid; grid-template-columns:repeat(3,1fr); gap:2px; }
   .grp { grid-column:1/-1; }
+  .railFade { display:none; } /* 宽屏网格布局不滚动，不需要渐隐提示 */
   .main { margin-left:0; }
   /* the slider gets the panel's full width: 26px side padding + 30px tick
      margins ate 112px of a 332px panel */
@@ -164,6 +171,7 @@ body { background:var(--bg); color:var(--text); font-family:"Segoe UI","Microsof
   #logoToggle .caret { color:var(--blue); font-size:10px; }
   #logoRail { display:none; }
   #logoRail.open { display:block; max-height:240px; overflow-y:auto; padding:8px; }
+  #logoRail.open .railFade { display:block; }
   .meta { padding:6px 12px 0; min-height:0; }
   #chartPanel .in-title { padding:2px 12px 6px; }
   #sankey { height:520px; }
@@ -1768,6 +1776,19 @@ function renderChart() {
 /* ------------------------------------------------------------------ *
  * 左栏：30 个案例格（纯文字 + 色块，无 emoji）
  * ------------------------------------------------------------------ */
+/* 选中项永远留在视野里：只改 rail 自己的 scrollTop，不动整页 */
+function revealActiveInRail(rail) {
+  if (!rail) return;
+  const act = rail.querySelector('.logo.active');
+  if (act && rail.clientHeight) {
+    const rr = rail.getBoundingClientRect(), er = act.getBoundingClientRect();
+    if (er.top < rr.top) rail.scrollTop -= (rr.top - er.top) + 6;
+    else if (er.bottom > rr.bottom) rail.scrollTop += (er.bottom - rr.bottom) + 6;
+  }
+  const fd = rail.querySelector('.railFade');
+  if (fd) fd.classList.toggle('hide', rail.scrollHeight - rail.scrollTop - rail.clientHeight <= 24);
+}
+
 function renderLogoRail() {
   const rail = document.getElementById('logoRail');
   if (!rail) return;
@@ -1783,6 +1804,13 @@ function renderLogoRail() {
       ).join('');
       return rows ? '<div class="grp">' + g.name + '</div>' + rows : '';
     }).join('');
+    /* 底部渐变：暗示还能往下滚，滚到底淡出 */
+    const fade = document.createElement('div');
+    fade.className = 'railFade';
+    rail.appendChild(fade);
+    rail.addEventListener('scroll', () => {
+      fade.classList.toggle('hide', rail.scrollHeight - rail.scrollTop - rail.clientHeight <= 24);
+    });
     rail.dataset.built = '1';
     rail.addEventListener('click', e => {
       const el = e.target.closest('.logo');
@@ -1801,6 +1829,7 @@ function renderLogoRail() {
     el.classList.toggle('active', on);
     el.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
+  revealActiveInRail(rail);
   syncLogoToggle();
 }
 function syncLogoToggle() {
@@ -2294,8 +2323,12 @@ function initControls() {
   const toggle = document.getElementById('logoToggle');
   if (toggle) {
     toggle.addEventListener('click', () => {
-      document.getElementById('logoRail').classList.toggle('open');
+      const rail = document.getElementById('logoRail');
+      rail.classList.toggle('open');
       syncLogoToggle();
+      if (rail.classList.contains('open')) {
+        requestAnimationFrame(() => revealActiveInRail(rail));
+      }
     });
   }
 }

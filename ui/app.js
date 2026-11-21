@@ -320,6 +320,19 @@ function renderChart() {
 /* ------------------------------------------------------------------ *
  * 左栏：30 个案例格（纯文字 + 色块，无 emoji）
  * ------------------------------------------------------------------ */
+/* 选中项永远留在视野里：只改 rail 自己的 scrollTop，不动整页 */
+function revealActiveInRail(rail) {
+  if (!rail) return;
+  const act = rail.querySelector('.logo.active');
+  if (act && rail.clientHeight) {
+    const rr = rail.getBoundingClientRect(), er = act.getBoundingClientRect();
+    if (er.top < rr.top) rail.scrollTop -= (rr.top - er.top) + 6;
+    else if (er.bottom > rr.bottom) rail.scrollTop += (er.bottom - rr.bottom) + 6;
+  }
+  const fd = rail.querySelector('.railFade');
+  if (fd) fd.classList.toggle('hide', rail.scrollHeight - rail.scrollTop - rail.clientHeight <= 24);
+}
+
 function renderLogoRail() {
   const rail = document.getElementById('logoRail');
   if (!rail) return;
@@ -335,6 +348,13 @@ function renderLogoRail() {
       ).join('');
       return rows ? '<div class="grp">' + g.name + '</div>' + rows : '';
     }).join('');
+    /* 底部渐变：暗示还能往下滚，滚到底淡出 */
+    const fade = document.createElement('div');
+    fade.className = 'railFade';
+    rail.appendChild(fade);
+    rail.addEventListener('scroll', () => {
+      fade.classList.toggle('hide', rail.scrollHeight - rail.scrollTop - rail.clientHeight <= 24);
+    });
     rail.dataset.built = '1';
     rail.addEventListener('click', e => {
       const el = e.target.closest('.logo');
@@ -353,6 +373,7 @@ function renderLogoRail() {
     el.classList.toggle('active', on);
     el.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
+  revealActiveInRail(rail);
   syncLogoToggle();
 }
 function syncLogoToggle() {
@@ -846,8 +867,12 @@ function initControls() {
   const toggle = document.getElementById('logoToggle');
   if (toggle) {
     toggle.addEventListener('click', () => {
-      document.getElementById('logoRail').classList.toggle('open');
+      const rail = document.getElementById('logoRail');
+      rail.classList.toggle('open');
       syncLogoToggle();
+      if (rail.classList.contains('open')) {
+        requestAnimationFrame(() => revealActiveInRail(rail));
+      }
     });
   }
 }

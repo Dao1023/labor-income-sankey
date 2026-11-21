@@ -237,3 +237,17 @@ CDP 真实鼠标拖动（派遣案例 lo=5,000 / hi=9,000，滑杆 21 档）：
   - 真实点击首行 / 第 20 行 / 末行：`公务员`(#c=gov-civil, 72 paths)、`自由设计师`(#c=freelance, 39)、
     `跨境远程 / 数字游民`(#c=remote, 46)，标题与节点文字均变化，`window.onerror` 0。
 - 截图：`shots/rail-1600.png`、`rail-1366.png`、`rail-980.png`、`rail-760.png`、`rail-640.png`、`rail-640-open.png`、`rail-1600-bottom.png`。
+
+## §13 左栏可滚动性与选中项可见性（m01251）
+
+- **选中行自动进视野**：新增 `revealActiveInRail(rail)`，只改 `rail.scrollTop`（比较 rail/行的 `getBoundingClientRect()`，
+  `+6px` 余量），不动整页；`renderLogoRail()` 末尾调用（初始化 + 每次 `selectCase()` 后），
+  抽屉 `#logoToggle` 展开时再 `requestAnimationFrame` 调一次（隐藏状态下量不到尺寸）。
+- **滚动暗示**：rail 内末尾 sticky 一层 `.railFade`（`height:28px; margin-top:-28px; background:linear-gradient(to top,var(--card),rgba(255,255,255,0))`，
+  `pointer-events:none`），剩余可滚距离 `≤24px` 时加 `.hide`（opacity 0）淡出；`≤980px` 网格布局不滚动 → `display:none`，
+  `≤680px` 抽屉展开时 `display:block`。
+- **组标题结构感**：`.grp` 改 `color:#5b6b82`、`margin:14px 0 4px 10px`、`padding-bottom:4px`、`border-bottom:1px solid rgba(100,116,139,.16)`，首组 `margin-top:0`。
+- 实测（1600×1050）：默认 `scrollTop 0`、fade opacity 1；点末行「跨境远程 / 数字游民」→ `scrollTop 215`、行完整可见、fade 0、`window.scrollY` 0；
+  带 `#c=remote` 刷新 → `scrollTop 220`、选中行可见、fade 0。640×900：抽屉展开 → `scrollTop 867`、选中行可见、fade 0；980px：fade `display:none`、rail 不可滚。
+- 截图：`shots/rail-1600.png`（顶部，底部渐隐）、`rail-1600-active.png`（选中末行，渐隐已淡出）、`rail-1600-reload.png`、
+  `rail-640-active.png`（抽屉展开并定位到选中行）。
