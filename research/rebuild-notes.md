@@ -213,3 +213,27 @@ CDP 真实鼠标拖动（派遣案例 lo=5,000 / hi=9,000，滑杆 21 档）：
 ```
 
 截图：`shots/tip-dispatch.png`（tooltip 里的基数说明）、`shots/final-dispatch.png`。
+
+## §12 左栏改成「分组文字清单」（m01173）
+
+用户原话：「左侧的列表不太清晰，我们从方块改成一行一行文本吧，然后把他们聚合分类一下」。
+
+- 容器：`#logoRail` 132px → **208px**，`display:grid` 2 列 → `display:block` 单列，`padding:10px 8px`，
+  滚动条仍隐藏；`.main{margin-left:226px}`（208 + 18 gap）。
+- 分组标题 `.grp`：直接取 `LABOR_DATA.groups[].name`（体制内 / 国企 / 民企 / 派遣与外包 /
+  大厂金融外企 / 平台与灵活就业 / 非标与特殊），11px / 600 / `--muted` / `letter-spacing:.04em`，
+  首组 `margin-top:0`，无 emoji。
+- 每行 `.logo`：`display:block; height:28px; line-height:28px; padding:0 10px`，正文 13px，hover `#f1f5fb`，
+  active `#e8effc` + 蓝字 + 600 + `::before` 3px 圆角竖条（`left:0; top:6px; bottom:6px`）。
+  删除 `.mono` 彩色方块（含 aspect-ratio chip 样式），`data-id` / `.logo` class / 委托点击保持不变。
+- 分组渲染：`renderLogoRail()` 里 `bridge.groups().map(g => … case.group === g.id …)`，组内顺序 = `cases` 原顺序。
+- 响应式：≤980 → `position:static; width:100%; display:grid; grid-template-columns:repeat(3,1fr)`，`.grp{grid-column:1/-1}`，
+  `.main{margin-left:0}`；≤680 → 抽屉式 `display:none` / `.open{display:block; max-height:240px; overflow-y:auto}`。
+- 实测（私有 headless）：
+  - 1600/1366：rail 208px，`display:block`，行高 28，7 组 / 30 行，`.main` left 254（28 + 226）；
+    `scrollHeight 1058 > 914`，滚动到底 `跨境远程 / 数字游民` 整行可见（`scrollTop 146`）。
+  - 980：rail 924px、`grid` 3 列（300.66×3）、组标题跨 3 列；760：704px / 3 列。
+  - 640：rail `display:none`，`#logoToggle` 可见；点开后 `display:block`、高 240、`scrollHeight 1054`、行高 28、7 组 30 行。
+  - 真实点击首行 / 第 20 行 / 末行：`公务员`(#c=gov-civil, 72 paths)、`自由设计师`(#c=freelance, 39)、
+    `跨境远程 / 数字游民`(#c=remote, 46)，标题与节点文字均变化，`window.onerror` 0。
+- 截图：`shots/rail-1600.png`、`rail-1366.png`、`rail-980.png`、`rail-760.png`、`rail-640.png`、`rail-640-open.png`、`rail-1600-bottom.png`。

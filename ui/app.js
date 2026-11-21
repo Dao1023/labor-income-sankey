@@ -325,11 +325,16 @@ function renderLogoRail() {
   if (!rail) return;
   const list = cases();
   if (!rail.dataset.built) {
-    rail.innerHTML = list.map(c =>
-      '<div class="logo" role="button" tabindex="0" data-id="' + c.id + '" aria-pressed="false" title="' + c.name + '">' +
-        '<div class="mono" style="background:' + bridge.tint(c) + '">' + bridge.short(c) + '</div>' +
-      '</div>'
-    ).join('');
+    /* 按用工形态分组：组标题 + 组内按 cases 原顺序，不重排 */
+    const groups = bridge.groups();
+    rail.innerHTML = groups.map(g => {
+      const rows = list.filter(c => c.group === g.id).map(c =>
+        '<div class="logo" role="button" tabindex="0" data-id="' + c.id + '" aria-pressed="false" title="' + c.name + '">' +
+          c.name +
+        '</div>'
+      ).join('');
+      return rows ? '<div class="grp">' + g.name + '</div>' + rows : '';
+    }).join('');
     rail.dataset.built = '1';
     rail.addEventListener('click', e => {
       const el = e.target.closest('.logo');
